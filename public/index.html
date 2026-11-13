@@ -1,0 +1,1191 @@
+<!doctype html><html lang="en"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>SemanticKit Dependency Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
+<style>
+/* Layout: a toolbar over two columns. Left is the map: one row per tier, root at the top, edges drawn over the terms. Right is the detail of the selected term. */
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2430; --muted:#5b6475; --rule:#d9dde5;
+  --accent:#2f5d8a; --root:#8a6d1f; --root-bg:#f3ead0; --cycle:#a33a2c; --cycle-bg:#f7e3df;
+  --up:#2f5d8a; --up-bg:#dce8f4; --down:#7a4b93; --down-bg:#ecdff3; --ext:#6c7280;
+  --v-rdf:#6f8fb3; --v-rdfs:#4f7d6a; --v-owl:#8a6aa8; --v-foaf:#b57a3a; --v-other:#8b8f98;
+  --f-display:"Source Serif 4", Georgia, serif;
+  --f-body:"IBM Plex Sans", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --panel:#1a2029; --ink:#e3e7ee; --muted:#9aa3b2; --rule:#2c3440;
+  --accent:#7fb0e0; --root:#e0c06a; --root-bg:#3a3220; --cycle:#f08a7a; --cycle-bg:#3b2320;
+  --up:#7fb0e0; --up-bg:#1f3348; --down:#c79be0; --down-bg:#35264a; --ext:#9aa3b2;
+  --v-rdf:#7f9fc3; --v-rdfs:#6fa58d; --v-owl:#a98ac6; --v-foaf:#d09552; --v-other:#8b93a1; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --panel:#1a2029; --ink:#e3e7ee; --muted:#9aa3b2; --rule:#2c3440;
+  --accent:#7fb0e0; --root:#e0c06a; --root-bg:#3a3220; --cycle:#f08a7a; --cycle-bg:#3b2320;
+  --up:#7fb0e0; --up-bg:#1f3348; --down:#c79be0; --down-bg:#35264a; --ext:#9aa3b2;
+  --v-rdf:#7f9fc3; --v-rdfs:#6fa58d; --v-owl:#a98ac6; --v-foaf:#d09552; --v-other:#8b93a1; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--f-body)}
+.wrap{max-width:1500px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 64px;display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
+.wrap>*{min-width:0}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;text-wrap:balance;line-height:1.25;margin:0}
+h1{font-size:1.7rem}
+h2{font-size:1.35rem;margin-bottom:12px}
+h3{font-size:1.05rem;margin:18px 0 8px}
+p{margin:0 0 12px}
+code,.mono{font-family:var(--f-mono);font-size:.88em}
+a{color:var(--accent)}
+.eyebrow{font:500 .75rem/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.src{color:var(--muted);font:12px/1.5 var(--f-mono);overflow-wrap:anywhere}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
+header p{margin:6px 0 0;color:var(--muted);max-width:72ch}
+.tabs{display:flex;gap:6px}
+button{font-family:var(--f-body)}
+.seg{display:inline-flex;flex-wrap:wrap;gap:0;border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+.seg button,.tabs button,.btn{font:500 13px var(--f-body);padding:6px 12px;border:0;background:var(--panel);color:var(--ink);cursor:pointer}
+.seg button+button{border-left:1px solid var(--rule)}
+.tabs button,.btn{border:1px solid var(--rule);border-radius:4px}
+.seg button[aria-pressed="true"],.tabs button[aria-selected="true"]{background:var(--accent);color:var(--panel)}
+.tabs button[aria-selected="true"]{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,summary:focus-visible,[role="button"]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bar{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:12px 14px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end}
+.ctl{display:grid;gap:4px;min-width:0}
+.ctl>span{font:500 .7rem/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ctl input[type="text"]{font:14px var(--f-mono);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink);width:230px;max-width:100%;box-sizing:border-box}
+.checks{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+.checks label{display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;white-space:nowrap}
+.checks svg{flex:none}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px}
+.status{font-size:13px;color:var(--muted);flex-basis:100%}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}
+.main>*{min-width:0}
+.map{position:relative;background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:8px 16px}
+.map svg.edges{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.tier{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;padding:22px 0;border-top:1px solid var(--rule)}
+.tier:first-of-type{border-top:0}
+.tier h4{margin:0;font:600 .95rem var(--f-mono)}
+.tier h4 small{display:block;font:400 .75rem var(--f-body);color:var(--muted)}
+.units{display:flex;flex-wrap:wrap;gap:10px 6px;min-width:0;align-items:center}
+.term{font:13px/1.5 var(--f-mono);padding:2px 7px;border-radius:3px;border:1px solid var(--rule);border-left-width:3px;background:var(--bg);color:var(--ink);cursor:pointer;max-width:100%;overflow-wrap:anywhere;text-align:left}
+.term.v-rdf{border-left-color:var(--v-rdf)}.term.v-rdfs{border-left-color:var(--v-rdfs)}.term.v-owl{border-left-color:var(--v-owl)}.term.v-foaf{border-left-color:var(--v-foaf)}.term.v-other{border-left-color:var(--v-other)}
+.term.v-external{border-style:dashed;border-left-width:1px;color:var(--ext)}
+.term.dim{opacity:.28}
+.term.up{background:var(--up-bg);border-color:var(--up)}
+.term.down{background:var(--down-bg);border-color:var(--down)}
+.term.cyc{background:var(--cycle-bg);border-color:var(--cycle)}
+.term.sel{background:var(--ink);border-color:var(--ink);color:var(--bg);font-weight:500}
+.unit{display:inline-flex;flex-wrap:wrap;gap:4px;padding:3px;border-radius:4px;background:var(--cycle-bg);border:1px solid var(--cycle)}
+.unit.root{background:var(--root-bg);border-color:var(--root)}
+.e{fill:none;stroke-width:1.3}
+.e.up{stroke:var(--up)}.e.down{stroke:var(--down)}
+.e.k-type{stroke-dasharray:2 3}
+.e.k-dr{stroke-width:2.3}
+.e.k-ax{stroke-width:2.3;stroke-dasharray:7 3}
+.e.k-mod{stroke-dasharray:1 5;stroke-width:1}
+.e.far{opacity:.2}
+.e.near{opacity:.85}
+.side{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:16px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);max-height:calc(100vh - 24px);overflow:auto;box-sizing:border-box}
+.side h2{font-family:var(--f-mono);font-size:1.1rem;overflow-wrap:anywhere;margin-bottom:6px}
+.key{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;font-size:12px}
+.key .term{cursor:default;font-size:12px}
+.grp{display:grid;grid-template-columns:30px minmax(0,1fr);gap:4px 8px;margin-bottom:6px}
+.grp b{font:500 12px/2 var(--f-mono);color:var(--muted)}
+.grp div{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.side .term{font-size:12px}
+details{border-top:1px solid var(--rule);padding:10px 0 4px}
+summary{cursor:pointer;font:600 1rem var(--f-display)}
+summary small{font:400 12px var(--f-mono);color:var(--muted);margin-left:6px}
+details>*:not(summary){margin-top:8px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+td,th{text-align:left;padding:4px 8px 4px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-weight:500;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em}
+td.k{font-family:var(--f-mono);color:var(--muted);white-space:nowrap;font-size:12px}
+.empty{color:var(--muted);font-size:13px}
+/* notes */
+.notes{display:grid;gap:36px;max-width:1100px}
+.prose{max-width:72ch}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:20px;min-width:0}
+pre.trip{background:var(--bg);border:1px solid var(--rule);border-radius:4px;padding:10px 12px;overflow-x:auto;font:13px/1.5 var(--f-mono);margin:6px 0 14px}
+.cycles{display:grid;gap:16px}
+.cyc{border-left:3px solid var(--cycle);padding-left:14px;min-width:0}
+.cyc.root{border-left-color:var(--root)}
+.tag{display:inline-block;font:500 11px/1.6 var(--f-mono);padding:0 6px;border-radius:3px;background:var(--cycle-bg);color:var(--cycle);vertical-align:1px}
+.tag.root{background:var(--root-bg);color:var(--root)}
+.impl{display:grid;gap:14px}
+.impl>div{border-top:1px solid var(--rule);padding-top:12px}
+.impl b.d{font:600 .85rem var(--f-mono);color:var(--accent)}
+ol.order{padding-left:1.4em;margin:0}
+ol.order li{margin-bottom:6px}
+.notes code[role="button"]{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+@media (max-width:900px){
+  .main{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;max-height:46vh;order:-1}
+  .tier{grid-template-columns:minmax(0,1fr);gap:6px}
+  .tier h4 small{display:inline;margin-left:8px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+<style>
+.files{display:grid;gap:4px;min-width:0}
+.frow{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:13px;min-width:0}
+.frow label{display:inline-flex;gap:6px;align-items:center;cursor:pointer;min-width:0}
+.frow .fname{font-family:var(--f-mono);overflow-wrap:anywhere}
+.frow .meta{color:var(--muted);font:12px var(--f-mono)}
+.frow .err{color:var(--cycle);font-size:12px;flex-basis:100%}
+.link{background:none;border:0;padding:0;color:var(--accent);font:13px var(--f-body);cursor:pointer;text-decoration:underline}
+.link.danger{color:var(--cycle)}
+.wide{flex-basis:100%}
+.paste{display:grid;gap:8px;max-width:640px}
+.paste input,.paste textarea{font:13px var(--f-mono);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink);box-sizing:border-box;width:100%}
+.paste textarea{min-height:140px;resize:vertical}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.btn[disabled]{opacity:.45;cursor:default}
+body.drag .bar{outline:2px dashed var(--accent);outline-offset:3px}
+.blank{padding:40px 8px;color:var(--muted);max-width:60ch}
+.api{display:grid;gap:28px;max-width:1100px}
+.ask{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:12px 14px;min-width:0}
+.ask>summary{font:500 .7rem/1.6 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ask-log{display:grid;gap:10px;max-height:46vh;overflow:auto;margin-top:8px}
+.ask-log:empty{display:none}
+.ask-turn{display:grid;gap:2px;min-width:0}
+.ask-turn .who{font:500 .7rem var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ask-turn .msg{white-space:pre-wrap;overflow-wrap:anywhere;max-width:90ch}
+.ask-turn .msg .tlink{font-size:.88em}
+.ask-turn.claude .msg{border-left:3px solid var(--accent);padding-left:10px}
+.ask-turn .steps{font:12px/1.5 var(--f-mono);color:var(--muted);overflow-wrap:anywhere}
+.ask-form{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:flex-end}
+.ask-form textarea{flex:1 1 320px;min-width:0;font:14px/1.5 var(--f-body);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink);box-sizing:border-box;min-height:40px;resize:vertical}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--panel);border-top:2px solid var(--accent);box-shadow:0 -8px 28px rgba(0,0,0,.18);display:grid;grid-template-rows:auto minmax(0,1fr);max-height:86%;padding-bottom:env(safe-area-inset-bottom,0px)}
+.sheet-head{display:flex;gap:10px;align-items:center;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));min-width:0}
+.sheet-headline{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;background:none;border:0;padding:0;color:var(--ink);cursor:pointer;text-align:left}
+.sheet-headline b{font:600 1.05rem var(--f-mono);overflow-wrap:anywhere}
+.sheet-headline span{color:var(--muted);font-size:13px;overflow-wrap:anywhere;flex-basis:100%}
+.sheet-headline span:empty,.sheet:not(.open) .sheet-headline span{display:none}
+.sheet.open{height:86%}
+.sheet.open .sheet-head{border-bottom:1px solid var(--rule)}
+.sheet-body{overflow:auto;padding-block:20px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));animation:fold .2s ease-out}
+@keyframes fold{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.object{max-width:1100px;min-width:0}
+.term-view{min-width:0}
+.term-view.top{display:grid;gap:12px;padding-bottom:24px}
+h2.v-label{font:600 2rem/1.15 var(--f-display);margin:0}
+.v-comment p{margin:0;max-width:72ch;white-space:pre-wrap}
+.top .v-comment p{font-size:1.08rem}
+.v-line{display:grid;grid-template-columns:130px minmax(0,1fr);gap:2px 16px;align-items:baseline}
+.cap{font:500 .72rem var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.refs,.sig{display:inline-flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;min-width:0}
+.sep,.arrow{color:var(--muted)}
+.pfx summary{cursor:pointer;font:500 .7rem/1.6 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pfx{display:block;min-width:0;max-width:100%;overflow:hidden}.pfx .tablewrap{overflow-x:auto;max-width:100%}
+.pfx-table td{overflow-wrap:anywhere}
+.pfx-table{border-collapse:collapse;font-size:13px;margin-top:6px}
+.pfx-table td{padding:4px 16px 4px 0;vertical-align:top;border-top:1px solid var(--rule)}
+.pfx-table select{font:13px var(--f-mono);padding:2px 4px;background:var(--bg);color:var(--ink);border:1px solid var(--rule);border-radius:4px}
+.attached{border-top:1px solid var(--rule);margin-top:6px}
+.term-view.top{padding-bottom:0}
+.class-view{display:grid;gap:12px;padding:16px 0 20px;border-top:1px solid var(--rule)}
+.class-view:first-child{border-top:0;padding-top:0}
+/* one size for each meaning: a view (a class) > a group (rdfs:isDefinedBy) > a term > a key and its values; a comment is one size everywhere */
+.class-cap{font-size:12px;color:var(--muted)}
+.view-cap,.view-cap .tlink{font:600 15px var(--f-mono);color:var(--ink)}
+.view-cap{padding:6px 0 4px}
+/* in Properties: a group (rdfs:isDefinedBy) holds the lists of the classes the properties come from */
+.group-cap{font:600 14px var(--f-mono);color:var(--ink)}
+.from-cap,.from-cap .tlink{font:600 13px var(--f-mono);color:var(--muted)}
+.from-cap{padding:8px 0 2px}
+.group-cap{padding:10px 0 4px}
+.term-view.item>div:first-child>.tlink{font:600 14px var(--f-mono)}
+.item-note,#sheet-sub{font-size:13px;color:var(--muted);margin-top:2px}
+.term-note{margin:0 0 16px;max-width:72ch;white-space:pre-wrap}
+.item-view{padding-top:6px}
+.prop-tabs{justify-self:start;margin:2px 0 6px}
+.items>.items~.items>.term-view.item:first-child{border-top:1px solid var(--rule);padding-top:10px}
+.attached h3{margin:0 0 4px}
+.term-view.item{padding:10px 0;border-top:1px solid var(--rule);display:grid;gap:3px}
+.items .term-view.item:first-child{border-top:0;padding-top:0}
+.items{min-width:0}
+.sub-val small{margin-left:6px;font-size:11px;color:var(--muted)}
+.item .v-line{grid-template-columns:130px minmax(0,1fr)}
+.vals{display:flex;flex-wrap:wrap;gap:2px 14px;min-width:0}
+.vals.text{display:grid;gap:6px}
+.attached .term-view.item:first-of-type{border-top:0}
+.item .v-label{font:600 1rem var(--f-body);color:var(--ink)}
+.item .v-comment{grid-column:2;color:var(--muted);font-size:.92rem}
+@media (max-width:700px){.v-line,.item .v-line{grid-template-columns:minmax(0,1fr)}.item .v-comment{grid-column:1}}
+.lit small{font:400 11px var(--f-mono);color:var(--muted);margin-left:6px}
+.lit span{white-space:pre-wrap}
+.tlink{background:none;border:0;padding:0;font:500 .9rem var(--f-mono);color:var(--accent);cursor:pointer;text-align:left;overflow-wrap:anywhere}
+.tlink:hover{text-decoration:underline;text-underline-offset:3px}
+
+body.has-sheet .wrap{padding-bottom:120px}
+@media (prefers-reduced-motion:reduce){.sheet-body{animation:none}}
+.api table td{font-size:.88rem}
+.api td.k{white-space:normal}
+:root{--v-xsd:#3f8f9b;--c0:#b0487a;--c1:#5a7f2e;--c2:#a35f1c;--c3:#3b6fb5;--c4:#7d5bb0;--c5:#2e8a7a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--v-xsd:#5fb3bf;--c0:#e08ab0;--c1:#9cc46a;--c2:#d99a5a;--c3:#7fa8e0;--c4:#b59be0;--c5:#6cc4b4}}
+:root[data-theme="dark"]{--v-xsd:#5fb3bf;--c0:#e08ab0;--c1:#9cc46a;--c2:#d99a5a;--c3:#7fa8e0;--c4:#b59be0;--c5:#6cc4b4}
+</style>
+<style>
+/* one row of controls; Files and Filters open over the map */
+header{align-items:center}
+header h1{font-size:1.35rem}
+.wrap{padding-block:16px 64px;gap:12px}
+#view-map{gap:12px!important}
+.bar{padding:8px 10px;gap:8px;align-items:center;position:relative;z-index:20}
+.bar>input[type="text"]{font:14px var(--f-mono);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink);width:260px;max-width:100%;box-sizing:border-box}
+.pop{border:0;padding:0;position:relative}
+.pop>summary{list-style:none;font:500 13px var(--f-body);padding:6px 12px;border:1px solid var(--rule);border-radius:4px;background:var(--panel)}
+.pop>summary::-webkit-details-marker{display:none}
+.pop>summary::after{content:" ▾";color:var(--muted)}
+.pop[open]>summary{border-color:var(--accent)}
+.pop-body{position:absolute;top:calc(100% + 6px);left:0;z-index:40;background:var(--panel);border:1px solid var(--rule);border-radius:6px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:12px 14px;width:min(720px,calc(100vw - 32px));max-height:70vh;overflow:auto;display:grid;gap:12px;box-sizing:border-box;margin-top:0!important}
+#filters-pop .pop-body{left:auto;right:0}
+@media (max-width:700px){.pop{position:static}.pop-body,#filters-pop .pop-body{left:0;right:0;width:auto}}
+.status{flex-basis:auto;font-size:12px}
+.right{display:grid;gap:12px;align-content:start;min-width:0;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);max-height:calc(100vh - 24px);overflow:auto}
+.right .side{position:static;max-height:none}
+.ask{padding:10px 12px}
+.ask-log{margin-top:0;margin-bottom:8px;max-height:40vh}
+.ask-form{margin-top:0;flex-wrap:nowrap}
+.ask-form textarea{flex:1 1 auto;min-height:34px}
+@media (max-width:900px){.right{position:static;max-height:none;order:-1}.right .side{max-height:46vh}}
+</style>
+
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>SemanticKit Dependency Map</h1>
+  </div>
+  <div class="tabs" role="tablist" aria-label="View">
+    <button id="tab-map" role="tab" aria-selected="true" aria-controls="view-map">Map</button>
+    <button id="tab-api" role="tab" aria-selected="false" aria-controls="view-api">Tool access</button>
+    <button id="tab-notes" role="tab" aria-selected="false" aria-controls="view-notes">Notes</button>
+  </div>
+</header>
+
+<div id="view-map" role="tabpanel" aria-labelledby="tab-map" style="display:grid;gap:16px;grid-template-columns:minmax(0,1fr)">
+  <div class="bar">
+    <input type="text" id="q" list="termlist" placeholder="Term, for example rdfs:Class" autocomplete="off" aria-label="Term">
+    <datalist id="termlist"></datalist>
+    <div class="seg" role="group" aria-label="Reach">
+      <button id="reach-all" aria-pressed="true" type="button">Everything</button>
+      <button id="reach-direct" aria-pressed="false" type="button">Direct only</button>
+    </div>
+    <button class="btn" id="p-root" type="button">Root unit</button>
+    <button class="btn" id="p-clear" type="button">Clear</button>
+    <details class="pop" id="files-pop"><summary id="files-sum">Files</summary>
+      <div class="pop-body">
+        <div class="files" id="files"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px" id="file-actions">
+          <button class="btn primary" id="add-btn" type="button" title="Turtle, N-Triples or RDF/XML. You can also drop files on the page. A file with the same name replaces the old one.">Add files</button>
+          <button class="btn" id="paste-btn" type="button">Paste text</button>
+          <input type="file" id="file-input" multiple accept=".ttl,.nt,.n3,.turtle,.rdf,.owl,.xml,text/turtle,application/rdf+xml" hidden>
+        </div>
+        <form class="paste" id="paste" hidden>
+          <input type="text" id="paste-name" placeholder="File name, for example shacl.ttl" aria-label="File name" autocomplete="off">
+          <textarea id="paste-text" placeholder="Paste Turtle or RDF/XML here" aria-label="File text"></textarea>
+          <div style="display:flex;gap:6px"><button class="btn primary" type="submit">Add</button><button class="btn" type="button" id="paste-cancel">Cancel</button></div>
+        </form>
+      </div>
+    </details>
+    <details class="pop" id="view-pop"><summary>View</summary>
+      <div class="pop-body">
+        <div class="checks"><label><input type="checkbox" id="view-ont">Ontologies</label></div>
+        <p class="src" id="view-ont-list" style="margin:0"></p>
+      </div>
+    </details>
+    <details class="pop" id="filters-pop"><summary>Filters</summary>
+      <div class="pop-body">
+        <div class="ctl"><span>Edges</span><div class="checks" id="kinds"></div></div>
+        <div class="ctl"><span>Show</span><div class="checks" id="vocabs"></div></div>
+        <details class="ctl pfx" id="pfx"><summary id="pfx-sum">Prefixes</summary>
+          <div class="tablewrap"><table class="pfx-table" id="pfx-table"></table></div>
+        </details>
+      </div>
+    </details>
+  </div>
+
+  <div class="main">
+    <div class="map" id="map">
+      <div id="tiers"><p class="blank" id="blank">Loading the saved files.</p></div>
+      <svg class="edges" id="edges" aria-hidden="true">
+        <defs>
+          <marker id="m-up" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z" style="fill:var(--up)"/></marker>
+          <marker id="m-down" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z" style="fill:var(--down)"/></marker>
+        </defs>
+        <g id="paths"></g>
+      </svg>
+    </div>
+    <div class="right">
+      <aside class="side" id="side" aria-live="polite"></aside>
+      <section class="ask" id="ask" hidden aria-label="Ask Claude">
+        <div class="ask-log" id="ask-log" aria-live="polite"></div>
+        <form class="ask-form" id="ask-form">
+          <textarea id="ask-q" rows="1" placeholder="Ask Claude" aria-label="Question for Claude"></textarea>
+          <button class="btn primary" type="submit" id="ask-send">Ask</button>
+          <button class="btn" type="button" id="ask-stop" hidden>Stop</button>
+          <button class="btn" type="button" id="ask-new" title="New conversation">New</button>
+        </form>
+      </section>
+    </div>
+  </div>
+  <div class="status" id="status" aria-live="polite"></div>
+</div>
+
+<div class="sheet" id="sheet" role="region" aria-label="Details of the selected term" hidden>
+  <div class="sheet-head">
+    <button class="btn" id="sheet-back" type="button" hidden>Back</button>
+    <button class="sheet-headline" id="sheet-headline" type="button"><b id="sheet-id"></b><span id="sheet-sub"></span></button>
+    <button class="btn primary" id="sheet-toggle" type="button" aria-expanded="false" aria-controls="sheet-body">Details</button>
+  </div>
+  <div class="sheet-body" id="sheet-body" tabindex="-1" hidden></div>
+</div>
+
+<div id="view-api" role="tabpanel" aria-labelledby="tab-api" class="api" hidden>
+  <section class="prose">
+    <h2>Tool access for Claude</h2>
+    <p>This app runs on your computer. It keeps its files in its data folder and computes the map itself, so its answers are current whether or not this page is open. An MCP client, such as Claude Code, connects to the app at <code>http://localhost:<span class="port-here">4787</span>/mcp</code> and gets the operations below as tools.</p>
+<pre class="trip">claude mcp add --transport http dependency-map http://localhost:<span class="port-here">4787</span>/mcp</pre>
+    <p>A client can also start the app itself, over standard input and output: <code>claude mcp add dependency-map -- node &lt;path to DependencyMap&gt;/server.js --stdio</code>. The page is then served too, when the port is free.</p>
+  </section>
+  <section>
+    <h3>MCP tools</h3>
+    <div class="scroll"><table>
+      <tr><th>Tool</th><th>What it does</th></tr>
+      <tr><td class="k">summary</td><td>The files, with their triples and whether each is on, the number of terms and edges, the terms in each tier, and the cycles.</td></tr>
+      <tr><td class="k">order</td><td>The build order: one entry per unit, in tier order.</td></tr>
+      <tr><td class="k">term</td><td><code>id</code>: a term's IRI, <code>declaredIn</code>, <code>tier</code>, <code>unit</code> (the cycle, if the term is in one), label, comment, every statement about it, <code>hasToHappenFirst</code> (every term that must be generated before it, in tier order) and <code>waitsForIt</code>.</td></tr>
+      <tr><td class="k">terms_in</td><td><code>name</code>: the terms a file declares.</td></tr>
+      <tr><td class="k">find</td><td><code>text</code>: the terms whose id, IRI or label contains the text.</td></tr>
+      <tr><td class="k">files</td><td>The names of the loaded files.</td></tr>
+      <tr><td class="k">read_file</td><td><code>name</code>: the text of a loaded file.</td></tr>
+      <tr><td class="k">write_file</td><td><code>name</code>, <code>text</code>: a new file, or the new text of a loaded file. The map is computed again and this page shows it.</td></tr>
+      <tr><td class="k">load_file</td><td><code>path</code>, <code>name</code> (optional): a file on this computer, saved in the map as write_file does.</td></tr>
+      <tr><td class="k">enable_file</td><td><code>name</code>, <code>enabled</code>: turn a file on or off.</td></tr>
+      <tr><td class="k">remove_file</td><td><code>name</code>: remove a file and delete its saved copy.</td></tr>
+      <tr><td class="k">select</td><td><code>ids</code>: select terms on each open map page.</td></tr>
+    </table></div>
+    <h3>Command line</h3>
+<pre class="trip">node depmap-cli.js rdf.ttl rdfs.ttl owl.ttl            <span class="src"># summary: tiers and cycles</span>
+node depmap-cli.js *.ttl --term owl:cardinality        <span class="src"># what has to happen first, what waits for it</span>
+node depmap-cli.js *.ttl --order                       <span class="src"># the build order, one unit per line</span>
+node depmap-cli.js *.ttl --json                        <span class="src"># everything, as JSON</span></pre>
+  </section>
+  <section class="prose">
+    <h3>How the map is made</h3>
+    <p>Every IRI that is the subject of a statement in a loaded file is a term. Each statement from a term to a term is an edge, and the property of the statement is the name of the edge. A value inside a blank node (a list or a class expression) belongs to the statement that holds the blank node. The files say which edges are references: rdfs:seeAlso and each property that the files make a subproperty of it. References are drawn when you select them, but they are not used for cycles or tiers. A cycle is a strongly connected component, and it is generated as one unit. The tier of a term is the length of the longest dependency path below it.</p>
+  </section>
+</div>
+
+<div id="view-notes" role="tabpanel" aria-labelledby="tab-notes" class="notes" hidden>
+<p class="src">These notes are the text of the first version of this document, of 2026-10-31. They describe four files: the rdf and rdfs files from w3.org, owl.ttl and FOAF. The counts and tiers in them are not the counts and tiers of the files that are loaded now.</p>
+<section class="prose">
+  <h2>What has to happen first</h2>
+  <ol class="order">
+    <li><b>The root unit:</b> <code>rdfs:Resource</code>, <code>rdfs:Class</code> and <code>owl:Class</code>. They depend on each other, so the translator's first rule produces all three together. Nothing else can be generated before them.</li>
+    <li><b>The rule selectors</b> come next: <code>rdf:Property</code>, <code>rdfs:Datatype</code>, <code>rdfs:Literal</code>, <code>owl:Ontology</code> and <code>owl:Thing</code> (tier 1), then <code>owl:ObjectProperty</code>, <code>owl:DatatypeProperty</code> and <code>owl:AnnotationProperty</code> (tier 2). Every term in the files is typed by one of these. That <code>rdf:type</code> tells the translator which codegen rule applies, so the rules for these classes have to exist before any other term is translated.</li>
+    <li><b>The structural properties</b> are in tier 2: <code>rdf:type</code>, <code>rdfs:subClassOf</code>, <code>rdfs:subPropertyOf</code>, <code>rdfs:domain</code>, <code>rdfs:range</code>, <code>rdfs:label</code>, <code>rdfs:comment</code>, <code>rdf:first</code>, <code>rdf:rest</code> and <code>rdf:nil</code>. They are the predicates that every later term is stated with.</li>
+    <li><b>Then each tier in turn</b>, one unit at a time, with the order inside a tier left free. In FOAF, <code>foaf:Agent</code> is tier 1, the cycle of <code>foaf:Person</code>, <code>Document</code>, <code>Organization</code> and <code>Project</code> is tier 2, and <code>foaf:knows</code> and <code>foaf:name</code> are tier 3.</li>
+  </ol>
+  <p class="src">Ordering edges: rdf:type, rdfs:subClassOf, rdfs:subPropertyOf, rdfs:domain, rdfs:range and the OWL axioms. rdfs:isDefinedBy, owl:imports and owl:versionIRI name the ontology a term belongs to (its module, per D8 A), so they are drawn but left out of the order. Counted with them, the four ontology nodes join the root cycle.</p>
+</section>
+<section>
+  <div class="prose">
+    <h2>Where things are tied together</h2>
+    <p>The edges that become Swift structure, subClassOf and subPropertyOf (protocol inheritance, D1 A) and domain and range (typed members, D4 A), contain <b>no cycles</b> anywhere in the four files. Every cycle runs through <code>rdf:type</code>, through <code>rdfs:isDefinedBy</code>, or through a symmetric OWL axiom (<code>owl:disjointWith</code>, <code>owl:inverseOf</code>).</p>
+  </div>
+  <div class="cycles">
+    <div class="cyc root">
+      <h3><span class="tag root">tier 0</span> The root: rdfs:Resource, rdfs:Class, owl:Class</h3>
+      <p>rdfs:Class is an instance of itself. Resource is an instance of Class, and Class is a subclass of Resource. The W3C files alone make a two-term cycle. FOAF's file adds owl:Class to it, because it asserts that rdfs:Class is an owl:Class while owl.ttl makes owl:Class a subclass of rdfs:Class.</p>
+<pre class="trip">rdfs:Resource a rdfs:Class ;                        <span class="src"># rdfs.ttl line 9</span>
+rdfs:Class a rdfs:Class ;                           <span class="src"># rdfs.ttl line 14</span>
+	rdfs:subClassOf rdfs:Resource .
+owl:Class a rdfs:Class ;                            <span class="src"># owl.ttl line 83</span>
+     rdfs:subClassOf rdfs:Class .
+&lt;owl:Class rdf:about="http://www.w3.org/2000/01/rdf-schema#Class"/&gt;   <span class="src"># index.rdf line 38</span></pre>
+    </div>
+    <div class="cyc">
+      <h3><span class="tag">tier 2</span> FOAF's disjoint classes: Person, Document, Organization, Project</h3>
+      <p>Each one states <code>owl:disjointWith</code> against the others: Person and Document with Organization and Project, and Organization and Project with Person and Document (index.rdf lines 69–102). This is the only cycle among FOAF's classes, and it runs through disjointWith alone. The subClassOf edges from Person and Organization to Agent are acyclic.</p>
+    </div>
+    <div class="cyc">
+      <h3><span class="tag">tiers 3–4</span> FOAF's four inverse pairs</h3>
+      <p><code>made</code> and <code>maker</code>, <code>depiction</code> and <code>depicts</code>, <code>page</code> and <code>topic</code>, and <code>isPrimaryTopicOf</code> and <code>primaryTopic</code>. Each property names the other through <code>owl:inverseOf</code> (index.rdf lines 377–530). Each pair is one unit.</p>
+    </div>
+    <div class="cyc">
+      <h3><span class="tag">module</span> The ontology nodes</h3>
+      <p>Every rdfs term is <code>rdfs:isDefinedBy</code> <code>rdfs:</code>, and that ontology is an <code>owl:Ontology</code>, which is an rdfs:Class. Counted with isDefinedBy, <code>rdfs:</code> and <code>owl:Ontology</code> join the root cycle, making it five nodes. That is why isDefinedBy is treated as module membership, not as an ordering edge.</p>
+      <p>owl.ttl uses three different IRIs where the other files use one. It declares its ontology as <code>&lt;http://www.w3.org/2002/07/owl&gt;</code>, with no <code>#</code>, and gives that same IRI as its own <code>owl:versionIRI</code>. Its terms are <code>rdfs:isDefinedBy &lt;http://www.w3.org/2002/07/owl#&gt;</code>, which nothing declares. It <code>owl:imports &lt;http://www.w3.org/2000/01/rdf-schema&gt;</code>, also without a <code>#</code>, while rdfs.ttl declares its ontology as <code>&lt;http://www.w3.org/2000/01/rdf-schema#&gt;</code>. The map keeps them as separate nodes, as the files have them. Three owl terms are also isDefinedBy OWL 2 TR documents.</p>
+<pre class="trip">&lt;http://www.w3.org/2002/07/owl&gt; a owl:Ontology ;             <span class="src"># owl.ttl line 9</span>
+     owl:imports &lt;http://www.w3.org/2000/01/rdf-schema&gt; ;      <span class="src"># owl.ttl line 35</span>
+     owl:versionIRI &lt;http://www.w3.org/2002/07/owl&gt; ;          <span class="src"># owl.ttl line 36</span></pre>
+    </div>
+  </div>
+</section>
+<section class="prose">
+  <h2>What this means for step 1</h2>
+  <p>Step 1 per the direction doc and PLAN.md WP-P: OWL declarations generate Swift types, subClassOf becomes protocol inheritance, and domain and range become typed properties. The data says the following about each decision.</p>
+  <div class="impl">
+    <div><b class="d">D1 A · subClassOf is protocol inheritance</b><p>The subClassOf graph is acyclic in all four files, so every protocol refines protocols that already exist. Several parents do occur: <code>foaf:Person</code> is a subclass of both <code>foaf:Agent</code> and <code>geo:SpatialThing</code>, which only protocol inheritance can carry.</p></div>
+    <div><b class="d">D7 A · Resource and Thing are one root protocol</b><p>The root cycle exists only through <code>rdf:type</code>. Its subClassOf part is a plain chain: owl:Class, then rdfs:Class, then rdfs:Resource. Classes are resources that get translated (D7 A), so their <code>rdf:type</code> edge is the instance-of relation, and it selects the codegen rule. That makes the root one bootstrap unit that the translator's first rule emits, not something to hand-type (rule 0).</p></div>
+    <div><b class="d">D4 A · a property is a requirement on its domain's protocol</b><p><code>foaf:knows</code> has domain and range <code>foaf:Person</code>, so it lands on Person, typed Person. <code>foaf:name</code> has domain <b>owl:Thing</b> (index.rdf line 279), so under D7 A and D4 A it lands on the root protocol, not on Person. It also has range <code>rdfs:Literal</code> and refines <code>rdfs:label</code>. STEP-1-PLAN.md currently puts <code>name</code> on <code>PersonIndividual</code>, but the data puts it on the root. <code>alice.name</code> still works, because Alice conforms to the root.</p></div>
+    <div><b class="d">D6 A · literals</b><p><code>foaf:name</code>'s range is <code>rdfs:Literal</code>, which is tier 1, so a plain literal maps to String (rule 20) as soon as the literal rule exists. One referenced datatype, <code>xsd:nonNegativeInteger</code> (the range of OWL's cardinality properties), is not declared in any of the four files.</p></div>
+    <div><b class="d">D8 A · isDefinedBy is the declaring module</b><p>There are 189 isDefinedBy edges: 22 to <code>rdf:</code>, 15 to <code>rdfs:</code>, 77 to <code>owl:</code>, 72 to <code>foaf:</code> and 3 to OWL 2 TR documents. Treating them as the module keeps them out of the order, and the modules match the four files. For OWL, the module IRI (<code>owl:</code>, with <code>#</code>) differs from the declared ontology IRI (no <code>#</code>). Mapping isDefinedBy to the module has to account for both IRIs.</p></div>
+    <div><b class="d">Open for Charles · undeclared targets</b><p>Step 1's closure reaches four classes that none of the four files declares: <code>schema:Person</code>, <code>contact:Person</code>, <code>dcterms:Agent</code> (through owl:equivalentClass from Person and Agent) and <code>schema:CreativeWork</code> (from Document). None of the decisions say what owl:equivalentClass becomes when the other class has no declaration, so this is left for you.</p></div>
+  </div>
+</section>
+<section class="prose">
+  <h2>Sources and method</h2>
+  <p>Fetched on 2026-10-31 and used unchanged: <a href="https://www.w3.org/1999/02/22-rdf-syntax-ns.ttl">22-rdf-syntax-ns.ttl</a> (<span id="n-rdf"></span> triples), <a href="https://www.w3.org/2000/01/rdf-schema.ttl">rdf-schema.ttl</a> (<span id="n-rdfs"></span>), <a href="https://www.w3.org/2002/07/owl.ttl">owl.ttl</a> (<span id="n-owl"></span>) and <a href="http://xmlns.com/foaf/0.1/index.rdf">FOAF index.rdf</a> (<span id="n-foaf"></span>). The fetched index.rdf is byte-identical to <code>semantickit-parallel/foaf/index.rdf</code>, the step 1 fixture.</p>
+  <p>Every subject IRI in a file is a term. Each triple whose predicate is rdf:type, rdfs:subClassOf, rdfs:subPropertyOf, rdfs:domain, rdfs:range, rdfs:isDefinedBy or any owl: predicate with an IRI object (directly, or inside a blank-node list or restriction) is an edge. Edge counts: type 294 · isDefinedBy 189 · domain 124 · range 122 · subClassOf 52 · subPropertyOf 14 · owl:disjointWith 8 · owl:inverseOf 8 · owl:equivalentClass 5 · owl:imports 1 · owl:versionIRI 1 · owl:equivalentProperty 1. Cycles are strongly connected components, and a term's tier is the length of the longest dependency path below it. This is a documentation pass only. No repository, spec or plan file was changed.</p>
+</section>
+</div>
+
+</div>
+
+<script src="/vendor/n3.min.js"></script>
+<script src="/depmap-core.js"></script>
+<script src="/local.js"></script>
+<script>
+const CHUNK=80000;
+let CHOOSE={};try{CHOOSE=JSON.parse(localStorage.getItem('depmap-prefix')||'{}')||{}}catch(e){}
+const S={showOnt:false,choose:CHOOSE,reach:'all',kinds:new Set(),kset:new Set(),hidden:new Set(),sel:new Set(),auto:true};
+let FILES=[];          /* {id,name,format,enabled,key,count,triples,prefixes,error} */
+let D={terms:{},edges:[],tiers:[],cycles:[],triples:{}};
+let G={tier:{},unit:{},edges:[],out:{},inn:{},allOut:{},allIn:{}};
+const $=id=>document.getElementById(id);
+const ENV={get N3(){return window.N3},DOMParser:window.DOMParser};
+function el(t,c,txt){const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e}
+/* the group of an edge: the top of the rdfs:subPropertyOf line of its property, from the loaded files */
+const kindOf=p=>D.kinds[p];
+function vocabOf(id){const t=D.terms[id];return t?t.p:''}
+const palette={};
+function colorOf(v){if(!(v in palette)) palette[v]=Object.keys(palette).length%6;return 'var(--c'+palette[v]+')'}
+function say(t){$('status').textContent=t}
+function hash(s){let h=5381;for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)}
+
+/* ---------- analysis ---------- */
+function recompute(){
+  const use=FILES.filter(f=>f.enabled&&f.triples);
+  const keep=[...S.sel].map(id=>D.terms[id]&&D.terms[id].i).filter(Boolean),focus=sheet.id&&D.terms[sheet.id]?D.terms[sheet.id].i:null;
+  D=DepMap.analyze(use.map(f=>({name:f.name,triples:f.triples,prefixes:f.prefixes})),{bindings:FILES.filter(f=>f.prefixes).map(f=>({name:f.name,prefixes:f.prefixes})),choose:S.choose});
+  /* a prefix selection changes the names: keep the selection by IRI */
+  {const byIri=new Map(Object.keys(D.terms).map(id=>[D.terms[id].i,id]));S.sel=new Set(keep.map(i=>byIri.get(i)).filter(Boolean));if(focus) sheet.id=byIri.get(focus)||null}
+  indexFacts(use);ONT=ontologies();$('view-ont-list').textContent=ONT.size?[...ONT].sort().join(', '):'No ontologies in the loaded files.';
+  S.sel=new Set([...S.sel].filter(id=>id in D.terms));
+  if(S.auto&&D.tiers.length){S.sel=new Set([(rootUnit()||D.tiers[0].groups[0])[0]]);if(sheet.id&&!S.sel.has(sheet.id)){sheet.id=null;sheet.back=[]}}
+  renderFiles();renderKinds();renderPrefixes();build();renderTiers();renderVocabs();paint();
+  if(sheet.id&&!(sheet.id in D.terms)) focusTerm(S.sel.size?[...S.sel][0]:null);else if(!sheet.id&&S.sel.size) focusTerm([...S.sel][0]);else renderSheet();
+  $('q').value=S.sel.size===1?[...S.sel][0]:'';
+}
+function build(){
+  const tier={},unit={};
+  for(const t of D.tiers) for(const g of t.groups) for(const id of g){tier[id]=t.tier;unit[id]=g}
+  const out={},inn={},allOut={},allIn={};
+  for(const e of D.edges){const [s,p,o]=e;
+    (allOut[s]=allOut[s]||[]).push(e);(allIn[o]=allIn[o]||[]).push(e);
+    if(S.kinds.has(kindOf(p))){(out[s]=out[s]||[]).push(e);(inn[o]=inn[o]||[]).push(e)}}
+  G={tier,unit,edges:D.edges,out,inn,allOut,allIn};
+}
+function reach(adj,idx){
+  const seen=new Set();const st=[...S.sel];
+  if(S.reach==='direct'){for(const n of st) for(const e of adj[n]||[]) seen.add(e[idx]);}
+  else{const vis=new Set();while(st.length){const n=st.pop();if(vis.has(n))continue;vis.add(n);for(const e of adj[n]||[]){seen.add(e[idx]);st.push(e[idx])}}}
+  for(const s of S.sel) seen.delete(s);
+  return seen;
+}
+
+/* ---------- map ---------- */
+const chips={};
+function chip(id,small){
+  const v=vocabOf(id);
+  const b=el('button','term',id);b.type='button';b.title=(D.terms[id]||{}).i||id;
+  b.style.borderLeftColor=colorOf(v);
+  b.addEventListener('click',ev=>pick(id,ev.shiftKey||ev.metaKey||ev.ctrlKey,small));return b}
+function renderTiers(){
+  const box=$('tiers');box.textContent='';for(const k in chips) delete chips[k];
+  if(!D.tiers.length){
+    const none=!FILES.length;
+    box.appendChild(el('p','blank',Store.loading?'Loading the saved files.':none?'No files are loaded. Add a Turtle or RDF/XML file to see its terms, its cycles and its tiers.':'No file is switched on, or no file has a term. Switch a file on in the Files list.'));
+  }
+  for(const t of D.tiers){
+    const row=el('div','tier');const h=el('h4',null,'Tier '+t.tier);
+    const n=t.groups.reduce((a,g)=>a+g.length,0);h.appendChild(el('small',null,n+(n===1?' term':' terms')));row.appendChild(h);
+    const u=el('div','units');
+    const mk=id=>{const c=chip(id,false);chips[id]=c;return c};
+    for(const g of t.groups){
+      if(g.length>1){const w=el('span','unit'+(t.tier===0?' root':''));w.title='A cycle, generated as one unit';g.forEach(id=>w.appendChild(mk(id)));u.appendChild(w)}
+      else u.appendChild(mk(g[0]));
+    }
+    row.appendChild(u);box.appendChild(row);
+  }
+  const dl=$('termlist');dl.textContent='';Object.keys(G.tier).sort().forEach(k=>{const o=el('option');o.value=k;dl.appendChild(o)});
+  $('p-root').disabled=!rootUnit();
+}
+function rootUnit(){return D.tiers.length?D.tiers[0].groups.find(g=>g.length>1):null}
+let UP=new Set(),DOWN=new Set();
+function paint(){
+  UP=reach(G.out,2);DOWN=reach(G.inn,0);
+  const any=S.sel.size>0;
+  for(const id in chips){const c=chips[id];
+    c.hidden=S.hidden.has(vocabOf(id))||(!S.showOnt&&ONT.has(id));
+    c.classList.remove('sel','up','down','cyc','dim');
+    c.setAttribute('aria-pressed',S.sel.has(id));
+    if(!any) continue;
+    c.classList.add(S.sel.has(id)?'sel':UP.has(id)&&DOWN.has(id)?'cyc':UP.has(id)?'up':DOWN.has(id)?'down':'dim');
+  }
+  for(const u of document.querySelectorAll('#tiers .unit')) u.hidden=[...u.children].every(c=>c.hidden);
+  draw();side();if(sheet.state==='open') renderSheet();
+  const shown=G.edges.filter(e=>S.kinds.has(kindOf(e[1]))).length;
+  if(D.tiers.length) say(Object.keys(G.tier).length+' terms in '+D.tiers.length+' tiers, '+D.cycles.length+' cycles, '+shown+' of '+G.edges.length+' edges in use. Arrows point from a term to what it depends on. Shift-click adds a term to the selection.'+Store.note);
+  else say(Store.note.trim());
+}
+const NS='http://www.w3.org/2000/svg';
+function draw(){
+  const map=$('map'),svg=$('edges'),g=$('paths');g.textContent='';
+  const box=map.getBoundingClientRect();
+  svg.setAttribute('width',map.clientWidth);svg.setAttribute('height',map.clientHeight);
+  if(!S.sel.size||$('view-map').hidden) return;
+  const cache={};
+  const pos=id=>{if(id in cache)return cache[id];const c=chips[id];if(!c||c.hidden)return cache[id]=null;const r=c.getBoundingClientRect();
+    return cache[id]={x:r.left-box.left+r.width/2,t:r.top-box.top,b:r.bottom-box.top}};
+  const upS=new Set([...UP,...S.sel]),downS=new Set([...DOWN,...S.sel]);
+  const frag=document.createDocumentFragment();let far=0;
+  for(const [s,p,o] of G.edges){
+    const k=kindOf(p);if(!S.kinds.has(k))continue;
+    const near=S.sel.has(s)||S.sel.has(o);
+    let dir=null;
+    if(S.reach==='direct'){if(S.sel.has(s))dir='up';else if(S.sel.has(o))dir='down'}
+    else if(upS.has(s)&&upS.has(o))dir='up';else if(downS.has(s)&&downS.has(o))dir='down';
+    if(!dir)continue;
+    if(!near&&++far>1500) continue;
+    const a=pos(s),b=pos(o);if(!a||!b)continue;
+    let d;
+    if(s===o) d=`M${a.x-8},${a.t}C${a.x-26},${a.t-22} ${a.x+26},${a.t-22} ${a.x+8},${a.t}`;
+    else if(b.b<=a.t){const dy=Math.max(14,(a.t-b.b)*.5);d=`M${a.x},${a.t}C${a.x},${a.t-dy} ${b.x},${b.b+dy} ${b.x},${b.b}`}
+    else if(b.t>=a.b){const dy=Math.max(14,(b.t-a.b)*.5);d=`M${a.x},${a.b}C${a.x},${a.b+dy} ${b.x},${b.t-dy} ${b.x},${b.t}`}
+    else{const h=Math.min(20,8+Math.abs(a.x-b.x)*.08);d=`M${a.x},${a.t}C${a.x},${a.t-h} ${b.x},${b.t-h} ${b.x},${b.t}`}
+    const path=document.createElementNS(NS,'path');path.setAttribute('d',d);
+    path.setAttribute('class','e '+dir+(near?' near':' far'));if(LINE[k]){if(LINE[k][0]) path.style.strokeDasharray=LINE[k][0];if(LINE[k][1]) path.style.strokeWidth=LINE[k][1]}
+    if(near)path.setAttribute('marker-end','url(#m-'+dir+')');
+    (near?frag:g).appendChild(path);
+  }
+  g.appendChild(frag);
+}
+
+/* ---------- side panel ---------- */
+function byTier(set){
+  const rows={};for(const id of set){(rows[G.tier[id]]=rows[G.tier[id]]||[]).push(id)}
+  const w=el('div');
+  for(const t of Object.keys(rows).sort((a,b)=>a-b)){const r=el('div','grp');r.appendChild(el('b',null,'T'+t));const d=el('div');rows[t].sort().forEach(id=>d.appendChild(chip(id,true)));r.appendChild(d);w.appendChild(r)}
+  return w;
+}
+function section(title,count,body,open){
+  const d=el('details');d.open=open;const s=el('summary',null,title);s.appendChild(el('small',null,count));d.appendChild(s);d.appendChild(body);return d}
+function table(rows,idx){
+  const t=el('table');const tr=el('tr');['edge','term','file'].forEach(h=>tr.appendChild(el('th',null,h)));t.appendChild(tr);
+  for(const e of rows){const x=el('tr');x.appendChild(el('td','k',e[1]));const c=el('td');c.appendChild(chip(e[idx],true));x.appendChild(c);x.appendChild(el('td','k',e[3]));t.appendChild(x)}
+  const w=el('div','scroll');w.appendChild(t);return w}
+function side(){
+  const box=$('side');box.textContent='';
+  const sel=[...S.sel];
+  if(!sel.length){box.appendChild(el('h2',null,'No term selected'));box.appendChild(el('p','empty',D.tiers.length?'Select a term on the map, or type its name in the Term field.':'The detail of a term shows here.'));
+    if(D.cycles.length){const w=el('div');for(const c of D.cycles){const r=el('div','grp');r.appendChild(el('b',null,'T'+c.tier));const d=el('div');c.terms.forEach(id=>d.appendChild(chip(id,true)));r.appendChild(d);w.appendChild(r)}
+      box.appendChild(section('Cycles',D.cycles.length+' units',w,true))}
+    return}
+  const word=S.reach==='direct'?'directly':'in all';
+  if(sel.length===1){
+    const id=sel[0],t=D.terms[id];
+    box.appendChild(el('h2',null,id));
+    box.appendChild(el('p','src',t.i));
+    const u=G.unit[id];
+    box.appendChild(el('p',null,(t.f.length?'Declared in '+t.f.join(', ')+'.':'Referenced only. No loaded file declares it.')+' Tier '+G.tier[id]+'.'+(u.length>1?' In a cycle with '+u.filter(x=>x!==id).join(', ')+'. They are generated as one unit.':'')));
+    const more=el('button','btn primary','Details');more.type='button';more.addEventListener('click',()=>{focusTerm(id);openSheet(true)});box.appendChild(more);
+  }else{
+    box.appendChild(el('h2',null,sel.length+' terms selected'));
+    const d=el('div','key');sel.sort().forEach(id=>d.appendChild(chip(id,true)));box.appendChild(d);
+  }
+  const key=el('div','key');
+  [['sel','selected'],['up','has to happen first'],['down','waits for it'],['cyc','both: a cycle']].forEach(([c,l])=>key.appendChild(el('span','term '+c,l)));
+  box.appendChild(key);
+  box.appendChild(section('Has to happen first',UP.size+' terms '+word,UP.size?byTier(UP):el('p','empty','Nothing. No selected edge leaves this term.'),true));
+  box.appendChild(section('Waits for it',DOWN.size+' terms '+word,DOWN.size?byTier(DOWN):el('p','empty','Nothing depends on it through the selected edges.'),DOWN.size<=40));
+  if(sel.length===1){
+    const id=sel[0],o=G.allOut[id]||[],i=G.allIn[id]||[];
+    box.appendChild(section('Edges out',o.length+' triples',o.length?table(o,2):el('p','empty','None.'),false));
+    box.appendChild(section('Edges in',i.length+' triples',i.length?table(i.slice(0,500),0):el('p','empty','None.'),false));
+  }
+}
+
+/* ---------- details: the selected term as one object ---------- */
+let FX=DepMap.facts([]),IRI2ID=new Map(),PFX=[];
+const sheet={state:'none',id:null,back:[]};
+function indexFacts(use){
+  FX=DepMap.facts(use.map(f=>({name:f.name,triples:f.triples})));
+  IRI2ID=new Map(Object.keys(D.terms).map(id=>[D.terms[id].i,id]));
+  PFX=Object.keys(D.prefixes||{}).map(p=>[D.prefixes[p],p]).sort((a,b)=>b[0].length-a[0].length);
+}
+function short(iri){
+  const id=IRI2ID.get(iri);if(id) return id;
+  for(const [ns,p] of PFX) if(iri.indexOf(ns)===0){const l=iri.slice(ns.length);if(!/[\/#?\s<>]/.test(l)) return p+':'+l;break}
+  return '<'+iri+'>';
+}
+const RDFN=DepMap.RDF,RDFSN=DepMap.RDFS;
+/* The terms of RDF and RDFS that the view reads the loaded files with. Each other thing comes from the files. */
+const TYPE=RDFN+'type',LABEL=RDFSN+'label',COMMENT=RDFSN+'comment',SUBC=RDFSN+'subClassOf',SUBP=RDFSN+'subPropertyOf',
+  DOMAIN=RDFSN+'domain',RANGE=RDFSN+'range',RES=RDFSN+'Resource',LITERAL=RDFSN+'Literal',DATATYPE=RDFSN+'Datatype',ISDEF=RDFSN+'isDefinedBy';
+function textOf(iri,p){return DepMap.text(FX,iri,DepMap.family(FX,p))}
+function labelOf(id){const t=D.terms[id];return t?textOf(t.i,LABEL):''}
+function commentOf(id){const t=D.terms[id];return t?textOf(t.i,COMMENT):''}
+/* the IRIs that a value names: itself, or each IRI inside a blank node */
+function named(o,file){
+  if(o.t==='iri') return [o.v];if(o.t!=='bnode') return [];
+  const out=[],seen=new Set(),st=[o.v];
+  while(st.length){const b=st.pop();if(seen.has(b)) continue;seen.add(b);
+    for(const t of FX.bn.get(file+'\u0000'+b)||[]){if(t.o.t==='bnode') st.push(t.o.v);else if(t.o.t==='iri'&&!out.includes(t.o.v)) out.push(t.o.v)}}
+  return out}
+function pointsAt(iri,p){const r=[];for(const t of FX.subj.get(iri)||[]) if(t.p===p) for(const x of named(t.o,t.file)) if(!r.includes(x)) r.push(x);return r}
+/* the statements that point at a term, as [property, subject] */
+function incoming(iri){const r=[],seen=new Set();
+  for(const t of FX.obj.get(iri)||[]){const s=t.s.t==='iri'?t.s.v:DepMap.owner(FX,t.file,t.s.v);if(!s) continue;
+    const p=t.s.t==='iri'?t.p:null;if(!p) {const k=s;/* inside a blank node: the property is the one of the statement that holds it */
+      for(const x of FX.subj.get(s)||[]) if(x.o.t==='bnode'&&named(x.o,x.file).includes(iri)&&!seen.has(x.p+' '+k)){seen.add(x.p+' '+k);r.push([x.p,s])}
+      continue}
+    if(!seen.has(p+' '+s)){seen.add(p+' '+s);r.push([p,s])}}
+  return r}
+/* the terms that point at iri through p, and the terms that point at those, and so on */
+function below(iri,p){const out=[],st=[iri],seen=new Set([iri]);
+  while(st.length){const x=st.shift();for(const [q,y] of incoming(x)) if(q===p&&!seen.has(y)){seen.add(y);out.push(y);st.push(y)}}
+  return out}
+function supers(iri,p){const out=[],st=[iri],seen=new Set([iri]);
+  while(st.length){const x=st.shift();for(const y of pointsAt(x,p)) if(!seen.has(y)){seen.add(y);out.push(y);st.push(y)}}
+  return out}
+/* The ontologies in the files: each IRI that a term is rdfs:isDefinedBy, and each IRI that has an rdf:type of such an IRI.
+   They are not terms. View shows them only when its Ontologies box is checked. */
+let ONT=new Set();
+function ontologies(){
+  const out=new Set(),types=new Set();
+  for(const [iri,arr] of FX.obj) if(IRI2ID.has(iri)&&arr.some(t=>t.p===RDFSN+'isDefinedBy')){out.add(IRI2ID.get(iri));for(const c of pointsAt(iri,TYPE)) types.add(c)}
+  for(const id in D.terms) if(pointsAt(D.terms[id].i,TYPE).some(c=>types.has(c))) out.add(id);
+  return out}
+$('view-ont').addEventListener('change',e=>{S.showOnt=e.target.checked;paint()});
+/* obey the Show filter of the map: a term of an unselected vocabulary is left out */
+function shown(iri){
+  const id=IRI2ID.get(iri);if(id) return !S.hidden.has(vocabOf(id))&&(S.showOnt||!ONT.has(id));
+  const s=short(iri);return !S.hidden.has(s.charAt(0)==='<'?'':(s.slice(0,s.indexOf(':'))||':'))}
+/* the order of terms on the page is the order of the dependency tree: tier, then name */
+function order(iris){const tier=x=>{const id=IRI2ID.get(x);return id!==undefined&&id in G.tier?G.tier[id]:1e9};
+  return iris.slice().sort((a,b)=>tier(a)-tier(b)||(short(a)<short(b)?-1:1))}
+/* a reference to another term: its name, once. The tip gives its comment. */
+function ref(iri){
+  const id=IRI2ID.get(iri);
+  if(!id){if(/^https?:/.test(iri)){const a=el('a','tlink',short(iri).replace(/^<|>$/g,''));a.href=iri;a.target='_blank';a.rel='noopener';return a}
+    const c=el('code',null,short(iri));c.title=iri;return c}
+  const b=el('button','tlink',id);b.type='button';b.title=textOf(iri,COMMENT)||iri;b.addEventListener('click',()=>pick(id,false,true));return b}
+function lit(o){const s=el('span','lit');s.appendChild(el('span',null,o.v));
+  if(o.l) s.appendChild(el('small',null,'@'+o.l));else if(o.d&&!/#string$/.test(o.d)) s.appendChild(el('small',null,short(o.d)));return s}
+
+/* ---- The view of a property. The files define it. ----
+   The range of the property says what its values are. If the property states no range, the range of the
+   property above it (rdfs:subPropertyOf) applies. A literal range gives text. Each other range gives links to resources. */
+function rangeOf(p){for(const x of [p].concat(supers(p,SUBP))){const r=pointsAt(x,RANGE);if(r.length) return r}return []}
+function isLiteral(c){return c===LITERAL||supers(c,SUBC).includes(LITERAL)||pointsAt(c,TYPE).includes(DATATYPE)}
+function valuesView(p){
+  const r=rangeOf(p),text=r.length>0&&r.every(isLiteral);
+  return sts=>{const w=el('span',text?'vals text':'vals');
+    for(const x of sts){
+      if(x.o.t==='lit') w.appendChild(lit(x.o));
+      else for(const y of named(x.o,x.file)) if(shown(y)) w.appendChild(ref(y))}
+    return w.childNodes.length?w:null}}
+/* one field: the label of the property, then its values */
+function field(p,content,inverse){const d=el('div','v-line');const name=textOf(p,LABEL)||short(p);
+  const c=el('span','cap',inverse?'is '+name+' of':name);c.title=textOf(p,COMMENT)||short(p);d.appendChild(c);d.appendChild(content);return d}
+
+/* ---- The view of a class. The files define it. ----
+   Its fields are the properties that rdfs:domain attaches to the class. The view of rdfs:Resource is the top level,
+   because each term is a resource. The view of a subclass comes below the view of its superclass. */
+function attachedTo(c){const r=[];for(const [p,s] of incoming(c)) if(p===DOMAIN&&!r.includes(s)) r.push(s);return r}
+/* the domain of a property: the rdfs:domain it states; if it states none, the rdfs:domain of the nearest property above it (rdfs:subPropertyOf) */
+function domainsOf(p){let d=pointsAt(p,DOMAIN);if(d.length) return d;for(const q of supers(p,SUBP)){d=pointsAt(q,DOMAIN);if(d.length) return d}return []}
+function rangesOf(p){let d=pointsAt(p,RANGE);if(d.length) return d;for(const q of supers(p,SUBP)){d=pointsAt(q,RANGE);if(d.length) return d}return []}
+/* The classes of a resource (RDF 1.2 Schema 2.1, 2.2): the classes it states (rdf:type), the domain of each property it is the subject of,
+   the range of each property it is the value of, and each class above those (rdfs:subClassOf). rdfs:Resource is the class of everything. */
+function classesOf(iri){
+  const base=[RES].concat(pointsAt(iri,TYPE));
+  for(const t of FX.subj.get(iri)||[]) base.push(...domainsOf(t.p));
+  for(const [p] of incoming(iri)) base.push(...rangesOf(p));
+  const cls=[];for(const c of base){if(!cls.includes(c)) cls.push(c);for(const s of supers(c,SUBC)) if(!cls.includes(s)) cls.push(s)}
+  return cls.filter(c=>c===RES||shown(c)).map((c,i)=>[c,c===RES?-1:supers(c,SUBC).length,i]).sort((a,b)=>a[1]-b[1]||a[2]-b[2]).map(x=>x[0])}
+/* present a term. 'top': the reviewed term, with the statements that point at it. 'item': a term inside that view. */
+let PROP_TAB=null;
+/* the name of an ontology: the prefix whose namespace is its IRI */
+function prefixName(iri){for(const [ns,p] of PFX) if(ns===iri||ns===iri+'#'||ns===iri+'/') return p;return short(iri).replace(/^<|>$/g,'').replace(/:$/,'')}
+function present(iri,at,common,skip){
+  const st=FX.subj.get(iri)||[],out=el('div','term-view '+at),cls=classesOf(iri);
+  let props=[],tabs=null;const used=new Set(order([...new Set(st.map(x=>x.p))]).filter(shown)),secs=new Map(cls.map(c=>[c,[]]));
+  /* each statement of the term goes to the view of the class that its property is attached to */
+  /* The shape of the term: each class of the term (rdf:type, rdfs:subClassOf) has the properties whose rdfs:domain is that class.
+     Each one is a field of the term, with the values the term states. A statement with a property of no class goes to rdfs:Resource. */
+  /* A value of a property is a value of each property above it (rdfs:subPropertyOf, RDF 1.2 Schema 2.2.5). A property whose
+     super-property the view shows is a line inside that super-property's field, under its own name. */
+  const topOf=p=>{let t=p;for(const q of supers(p,SUBP)) if(shown(q)) t=q;return t};
+  /* rdfs:Resource is the class of everything (RDF 1.2 Schema 2.1.1): a statement that something is in it, or that a class is under it, says nothing */
+  const valsOf=p=>st.filter(x=>x.p===p&&!(x.o.t==='iri'&&x.o.v===RES&&rangesOf(p).includes(RDFSN+'Class')));
+  const tops=new Map();for(const p of used){const t=topOf(p);if(skip&&(skip.has(p)||skip.has(t))) continue;if(!tops.has(t)) tops.set(t,[]);tops.get(t).push(p)}
+  /* a statement belongs to the view of each domain of its property (a property with more domains puts its subject in each of them) */
+  for(const c of cls){const ts=order([...tops.keys()].filter(p=>{const d=domainsOf(p).filter(x=>cls.includes(x));return d.length?d.includes(c):c===RES}));
+    for(const t of ts){const subs=order(tops.get(t).filter(p=>p!==t)),own=valsOf(t);
+      /* a field with no value is not shown */
+      /* the values of the field are its own values and the values of each property below it; a value from a property below
+         names that property after it, as a literal names its datatype */
+      const box=el('span','vals');if(own.length){const n=valuesView(t)(own);if(n){box.className=n.className;box.append(...n.childNodes)}}
+      for(const p of subs){const v=valsOf(p);if(!v.length) continue;const n=valuesView(p)(v);if(!n) continue;if(n.classList.contains('text')) box.classList.add('text');
+        for(const x of [...n.childNodes]){const w=el('span','sub-val');w.appendChild(x);const m=el('small',null,textOf(p,LABEL)||short(p));m.title=textOf(p,COMMENT)||short(p);w.appendChild(m);box.appendChild(w)}}
+      if(box.childNodes.length) secs.get(c).push(field(t,box))}}
+  if(at==='top'){
+    /* rdfs:domain attaches a property to the term. Those properties are the fields of the view that the term defines.
+       They go to the view of the class that is the range of rdfs:domain. Each one is shown as a term, with its own fields. */
+    /* The term and each class above it (rdfs:subClassOf): a property whose domain is one of them has the term in its domain.
+       The properties of a class above the term are inherited, and say which class they come from. */
+    /* rdfs:Resource is the class of everything: its properties are the rdfs:Resource view of every term, not properties of this class */
+    const from=[iri].concat(supers(iri,SUBC).filter(k=>k!==RES)),rows=[],seen=new Set();
+    for(const k of from){
+      const inc=incoming(k).filter(x=>x[0]===DOMAIN&&shown(x[0])&&shown(x[1]));
+      for(const s of order([...new Set(inc.map(x=>x[1]))])){
+        if(!seen.has(s)){seen.add(s);rows.push([s,el('span'),k])}
+        /* each property below it (rdfs:subPropertyOf) has the same domain, inherited */
+        for(const x of order(below(s,SUBP))) if(!seen.has(x)&&shown(x)){seen.add(x);const n=el('span','class-cap',' domain inherited from ');n.appendChild(ref(s));rows.push([x,n,k])}}}
+    /* the properties are grouped by the value of their rdfs:isDefinedBy, in the order of its name; in each group, the term's own properties
+       come first, then those of each class above it (rdfs:subClassOf) under that class; each list is in the order of the property names */
+    const nameOf=x=>(textOf(x,LABEL)||short(x)).toLowerCase(),gOf=x=>pointsAt(x,ISDEF)[0]||'';
+    const allG=[...new Set(rows.map(r=>gOf(r[0])))].sort((x,y)=>(x==='')-(y==='')||prefixName(x).localeCompare(prefixName(y)));
+    for(const g of allG){
+      const outer=el('div','items');outer.dataset.g=g;if(g){const cap=el('div','group-cap',prefixName(g));cap.title=g;outer.appendChild(cap)}
+      for(const k of from){const list=rows.filter(r=>r[2]===k&&gOf(r[0])===g);if(!list.length) continue;
+      list.sort((a,b)=>nameOf(a[0]).localeCompare(nameOf(b[0])));
+      const box=el('div','items');if(k!==iri){const cap=el('div','from-cap');cap.appendChild(ref(k));box.appendChild(cap)}
+      /* a property is a resource too: it is shown by the views of its own classes (rdf:type), under its name and its comment */
+      /* what the list already says is not shown again: the classes every property of the group has (their views have no heading,
+         and an rdf:type to one of them is not shown), the rdfs:isDefinedBy of the group, and the rdfs:domain the list is under */
+      const common=new Set(list.map(r=>classesOf(r[0])).reduce((x,y)=>x.filter(c=>y.includes(c))));
+      for(const [x,n] of list){const skip=new Set([LABEL,COMMENT].concat(g?[ISDEF]:[]));
+        if(pointsAt(x,TYPE).every(c=>common.has(c))) skip.add(TYPE);
+        if(pointsAt(x,DOMAIN).every(d=>d===k)) skip.add(DOMAIN);
+        const row=present(x,'item',common,skip);const h=el('div'),r=ref(x),lb=textOf(x,LABEL),cm=textOf(x,COMMENT);
+        if(lb){r.textContent=lb;r.title=short(x)}h.appendChild(r);h.appendChild(n);if(cm) h.appendChild(el('div','item-note',cm));row.insertBefore(h,row.firstChild);box.appendChild(row)}
+      outer.appendChild(box)}
+      props.push(outer)}
+    /* rdfs:isDefinedBy selects which properties the list shows, one value at a time. Each value is named by its prefix. */
+    const gs=[...new Set(rows.map(r=>pointsAt(r[0],ISDEF)[0]).filter(Boolean))].sort((a,b)=>prefixName(a).localeCompare(prefixName(b)));
+    if(gs.length){tabs=el('div','seg prop-tabs');tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Defined by');
+      let cur=gs.includes(PROP_TAB)?PROP_TAB:'*';
+      const apply=()=>{for(const b of tabs.children) b.setAttribute('aria-pressed',b.dataset.g===cur);
+        /* All shows each group under its name; a tab shows its group alone, without the name */
+        for(const o of props){o.hidden=cur!=='*'&&!!o.dataset.g&&o.dataset.g!==cur;const c=o.querySelector(':scope>.group-cap');if(c) c.hidden=cur!=='*'}};
+      for(const g of ['*'].concat(gs)){const b=el('button',null,g==='*'?'All':prefixName(g));b.type='button';if(g!=='*') b.title=g;b.dataset.g=g;b.addEventListener('click',()=>{cur=PROP_TAB=g;apply()});tabs.appendChild(b)}
+      apply()}
+    /* The domain of the term: the domain it states, and the domain of each property above it (rdfs:subPropertyOf). */
+    const own=pointsAt(iri,DOMAIN);
+    for(const q of supers(iri,SUBP)) for(const d of pointsAt(q,DOMAIN)) if(!own.includes(d)&&shown(d)&&shown(DOMAIN)){
+      const w=el('span','vals');w.appendChild(ref(d));const n=el('span','class-cap',' inherited from ');n.appendChild(ref(q));w.appendChild(n);
+      for(const c of domainsOf(DOMAIN).filter(x=>cls.includes(x))) secs.get(c).push(field(DOMAIN,w))}
+  }
+  for(const c of cls){const nodes=secs.get(c);if(!nodes.length) continue;
+    /* the definition is one block: the fields of each view the term has, in the order of the views */
+    if(at==='top'){let sec=out.querySelector(':scope>section.definition');if(!sec){sec=el('section','class-view definition');out.appendChild(sec)}
+      nodes.forEach(n=>sec.appendChild(n))}
+    else if(common&&common.has(c)) nodes.forEach(n=>out.appendChild(n));
+    else{const sec=el('div','item-view');const cap=el('div','view-cap');cap.appendChild(ref(c));sec.appendChild(cap);nodes.forEach(n=>sec.appendChild(n));out.appendChild(sec)}}
+  /* the properties that have the term in their domain: one section */
+  if(props.length){const sec=el('section','class-view');sec.appendChild(el('div','view-cap','Properties'));if(tabs) sec.appendChild(tabs);props.forEach(n=>sec.appendChild(n));out.appendChild(sec)}
+  return out}
+function renderSheet(){
+  const box=$('sheet'),id=sheet.id;
+  if(sheet.state==='none'||!id||!D.terms[id]){box.hidden=true;document.body.classList.remove('has-sheet');return}
+  box.hidden=false;document.body.classList.add('has-sheet');
+  const open=sheet.state==='open';box.classList.toggle('open',open);
+  const t=D.terms[id];
+  /* the label and the comment of the term (rdfs:Resource) are its display, as for every term in the view */
+  $('sheet-id').textContent=textOf(t.i,LABEL)||id;$('sheet-id').title=id;$('sheet-sub').textContent='';
+  $('sheet-toggle').textContent=open?'Fold down':'Details';$('sheet-toggle').setAttribute('aria-expanded',open);
+  $('sheet-back').hidden=!open||!sheet.back.length;
+  const body=$('sheet-body');body.hidden=!open;body.textContent='';
+  if(!open) return;
+  const obj=el('article','object');
+  /* the comment of the term is its description, at the start of the view */
+  {const cm=textOf(t.i,COMMENT);if(cm) obj.appendChild(el('p','term-note',cm))}
+  /* the definition of the term (RDF 1.2 Schema 2.1, 8): its name (rdfs:label), its description (rdfs:comment), the class it is an instance of
+     (rdf:type) and the class it is a subclass of (rdfs:subClassOf). The classes choose the view; they are not headings. */
+  const top=present(t.i,'top',null,new Set([LABEL,COMMENT]));
+  if(!top.childNodes.length) top.appendChild(el('p','empty','The loaded files have no statement about this term in the vocabularies that Show selects.'));
+  obj.appendChild(top);
+  body.appendChild(obj);body.scrollTop=0;
+}
+function focusTerm(id){
+  if(!id){sheet.id=null;sheet.state='none';sheet.back=[];renderSheet();return}
+  if(sheet.id&&sheet.id!==id&&sheet.state==='open'){sheet.back.push(sheet.id);if(sheet.back.length>50) sheet.back.shift()}
+  sheet.id=id;if(sheet.state==='none') sheet.state='peek';renderSheet();
+}
+function openSheet(on){if(!sheet.id) return;sheet.state=on?'open':'peek';if(!on) sheet.back=[];renderSheet();if(on) $('sheet-body').focus()}
+$('sheet-toggle').addEventListener('click',()=>openSheet(sheet.state!=='open'));
+$('sheet-headline').addEventListener('click',()=>openSheet(sheet.state!=='open'));
+$('sheet-back').addEventListener('click',()=>{const id=sheet.back.pop();if(id&&D.terms[id]){const keep=sheet.back.slice();pick(id,false,true);sheet.back=keep;renderSheet()}});
+
+/* ---------- controls ---------- */
+function pick(id,add,fromSide){
+  if(!(id in G.tier)){say('No term named '+id+' in the loaded files.');return}
+  S.auto=false;if(add){S.sel.has(id)?S.sel.delete(id):S.sel.add(id)}else{S.sel=new Set([id])}
+  $('q').value=S.sel.size===1?[...S.sel][0]:'';
+  paint();focusTerm(S.sel.has(id)?id:(S.sel.size?[...S.sel][0]:null));
+  if(fromSide&&chips[id]&&!chips[id].hidden) chips[id].scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+}
+function setReach(r){S.reach=r;$('reach-all').setAttribute('aria-pressed',r==='all');$('reach-direct').setAttribute('aria-pressed',r==='direct');paint()}
+function showTab(w){for(const t of ['map','api','notes']){$('view-'+t).hidden=t!==w;$('tab-'+t).setAttribute('aria-selected',t===w)}if(w==='map')draw();else if(sheet.state==='open') openSheet(false)}
+function renderVocabs(){
+  const box=$('vocabs');const list=[...new Set(Object.keys(D.terms).map(vocabOf))].sort();
+  const sig=list.join('|');if(box.dataset.sig===sig) return;box.dataset.sig=sig;box.textContent='';
+  for(const v of list){
+    const l=el('label');const c=el('input');c.type='checkbox';c.id='v-'+(v||'none');c.checked=!S.hidden.has(v);
+    c.addEventListener('change',()=>{c.checked?S.hidden.delete(v):S.hidden.add(v);paint()});
+    l.appendChild(c);
+    const sw=el('span','sw');sw.style.background=colorOf(v);l.appendChild(sw);
+    l.appendChild(document.createTextNode(v===''?'no prefix':v===':'?': (empty prefix)':v));box.appendChild(l)}
+}
+/* every prefix of every loaded file, by namespace. More than one prefix: select the one to show. */
+function renderPrefixes(){
+  const list=(D.namespaces||[]).slice().sort((a,b)=>(b.aliases.length>1)-(a.aliases.length>1)||(a.used<b.used?-1:1));
+  const multi=list.filter(n=>n.aliases.length>1).length;
+  $('pfx').hidden=!list.length;
+  $('pfx-sum').textContent='Prefixes: '+list.length+' namespaces, '+multi+' with more than one prefix';
+  const t=$('pfx-table');t.textContent='';
+  const name=l=>l===''?':':l+':';
+  for(const n of list){const r=el('tr');const a=el('td','k');
+    if(n.aliases.length>1){const sel=el('select');sel.setAttribute('aria-label','Prefix for '+n.ns);
+      for(const x of n.aliases){const o=el('option',null,name(x.label));o.value=x.label;if(x.label===n.used) o.selected=true;sel.appendChild(o)}
+      sel.addEventListener('change',()=>{S.choose[n.ns]=sel.value;try{localStorage.setItem('depmap-prefix',JSON.stringify(S.choose))}catch(e){}recompute()});
+      a.appendChild(sel)}
+    else a.textContent=name(n.used);
+    r.appendChild(a);r.appendChild(el('td','k',n.ns));
+    const f=el('td');n.aliases.forEach(x=>{const d=el('div');d.appendChild(el('code',null,name(x.label)));d.appendChild(document.createTextNode(' in '+x.files.join(', ')));f.appendChild(d)});
+    r.appendChild(f);t.appendChild(r)}
+}
+/* a zip archive (stored entries) of [name, text] pairs */
+const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function zipOf(entries){const enc=new TextEncoder(),parts=[],cen=[];let off=0;
+  const now=new Date(),dt=((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate(),tm=(now.getHours()<<11)|(now.getMinutes()<<5)|(now.getSeconds()>>1);
+  for(const [name,text] of entries){const nb=enc.encode(name),db=enc.encode(text);let c=0xFFFFFFFF;for(const b of db) c=CRC_T[(c^b)&255]^(c>>>8);c=(c^0xFFFFFFFF)>>>0;
+    const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,tm,true);h.setUint16(12,dt,true);
+    h.setUint32(14,c,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+    const e=new DataView(new ArrayBuffer(46));e.setUint32(0,0x02014b50,true);e.setUint16(4,20,true);e.setUint16(6,20,true);e.setUint16(8,0x0800,true);e.setUint16(10,0,true);e.setUint16(12,tm,true);e.setUint16(14,dt,true);
+    e.setUint32(16,c,true);e.setUint32(20,db.length,true);e.setUint32(24,db.length,true);e.setUint16(28,nb.length,true);e.setUint32(42,off,true);
+    parts.push(new Uint8Array(h.buffer),nb,db);cen.push(new Uint8Array(e.buffer),nb);off+=30+nb.length+db.length}
+  const csize=cen.reduce((a,b)=>a+b.length,0),end=new DataView(new ArrayBuffer(22));end.setUint32(0,0x06054b50,true);end.setUint16(8,entries.length,true);end.setUint16(10,entries.length,true);end.setUint32(12,csize,true);end.setUint32(16,off,true);
+  return new Blob([...parts,...cen,new Uint8Array(end.buffer)])}
+function renderFiles(){
+  const box=$('files');box.textContent='';
+  if(!FILES.length&&!Store.loading){box.appendChild(el('span','empty','No files yet.'));}
+  for(const f of FILES){
+    const row=el('div','frow');const l=el('label');const c=el('input');c.type='checkbox';c.id='f-'+f.id;c.checked=f.enabled;c.disabled=!Store.canWrite||!!f.error;
+    c.addEventListener('change',()=>Store.setEnabled(f,c.checked));
+    l.appendChild(c);l.appendChild(el('span','fname',f.name));row.appendChild(l);
+    row.appendChild(el('span','meta',f.error?'not read':f.count+' triples'));
+    if(typeof f.text==='string'){
+      const dl=el('button','link','Download');dl.type='button';dl.title='Save '+f.name+' to your computer, as it is in the app';
+      dl.addEventListener('click',async()=>{try{await DepMapAPI.saveToComputer(f.name)}catch(e){const m=e&&(e.code||e.message);if(m!=='declined'){dl.textContent='Download failed: '+String(e&&e.message||m||e).slice(0,160);setTimeout(()=>{dl.textContent='Download'},15000)}}});
+      row.appendChild(dl)}
+    if(Store.canWrite){
+      const rm=el('button','link','Remove');rm.type='button';
+      rm.addEventListener('click',()=>{if(rm.dataset.sure){Store.remove(f)}else{rm.dataset.sure='1';rm.textContent='Remove '+f.name+'? Select again to confirm';rm.classList.add('danger');setTimeout(()=>{delete rm.dataset.sure;rm.textContent='Remove';rm.classList.remove('danger')},5000)}});
+      row.appendChild(rm)}
+    if(f.error) row.appendChild(el('span','err',f.error));
+    box.appendChild(row);
+  }
+  $('file-actions').hidden=!Store.canWrite;
+  $('files-sum').textContent='Files: '+FILES.filter(f=>f.enabled).length+' of '+FILES.length+' on';
+}
+function parseInto(f,text){
+  try{f.format=f.format||DepMap.detectFormat(f.name,text);const r=DepMap.parse(f.name,text,f.format,ENV);f.text=text;f.triples=r.triples;f.prefixes=r.prefixes;f.count=r.triples.length;f.error=null}
+  catch(e){f.triples=null;f.count=0;f.error='This file could not be read: '+String(e&&e.message||e).slice(0,300)}
+  return f;
+}
+function docId(name){return (name.replace(/[^A-Za-z0-9_\-.~:@+]/g,'_').replace(/^\.+/,'_')||'file').slice(0,150)}
+
+/* ---------- storage: the artifact database when there is one, else this visit only ---------- */
+const Store={db:null,canWrite:true,loading:true,note:'',chain:Promise.resolve(),
+  async init(){
+    let db=null,user=null;
+    try{if(window.claude&&window.claude.use){db=await window.claude.use('db');user=await window.claude.use('user')}}catch(_){}
+    if(!db){this.loading=false;this.note=' Files are kept for this visit only, because the saved storage is not available in this view.';recompute();return}
+    this.db=db;
+    try{if(user&&(await user.can('data.write'))===false) this.canWrite=false}catch(_){}
+    const timer=setTimeout(()=>{if(this.loading){this.note=' The saved files cannot be reached yet.';paint()}},10000);
+    db.collection('files').limit(1000).onSnapshot(snap=>{
+      if(!snap.metadata.fromCache){clearTimeout(timer);this.note=''}
+      const metas=snap.docs.map(d=>Object.assign({id:d.id},d.data()));
+      this.chain=this.chain.then(()=>this.sync(metas)).catch(e=>say('The files could not be loaded: '+(e&&e.message||e)));
+    },e=>{clearTimeout(timer);this.loading=false;this.note=' The saved files cannot be read ('+(e&&e.code||'error')+').';recompute()});
+  },
+  keyOf(m){return m.rev?String(m.rev):'t'+(typeof m.text==='string'?m.text.length+':'+hash(m.text):m.chunks||0)},
+  async sync(metas){
+    const next=[];
+    for(const m of metas){
+      const key=this.keyOf(m);let f=FILES.find(x=>x.id===m.id&&x.key===key);
+      if(!f){
+        f={id:m.id,name:m.name||m.id,format:m.format||null,key};
+        try{let text=typeof m.text==='string'?m.text:null;
+          if(text===null){const q=await this.db.collection('files/'+m.id+'/chunks').limit(1000).get();
+            text=q.docs.slice().sort((a,b)=>a.id<b.id?-1:1).map(d=>d.data().text||'').join('')}
+          parseInto(f,text)}
+        catch(e){f.triples=null;f.count=0;f.error='This file could not be loaded: '+(e&&e.message||e)}
+      }
+      f.enabled=m.enabled!==false;next.push(f);
+    }
+    FILES=next.sort((a,b)=>a.name<b.name?-1:1);this.loading=false;recompute();
+    if(this.canWrite) await this.publish();
+  },
+  async add(name,text){
+    const f=parseInto({id:docId(name),name,format:null,enabled:true,key:Date.now().toString(36)+hash(text)},text);
+    if(f.error){say(name+': '+f.error);return false}
+    if(!this.db){FILES=FILES.filter(x=>x.id!==f.id).concat(f).sort((a,b)=>a.name<b.name?-1:1);recompute();say(name+' is added: '+f.count+' triples.'+this.note);return true}
+    say('Saving '+name+'.');
+    try{
+      const meta={name,format:f.format,enabled:true,rev:f.key,bytes:text.length,addedAt:new Date().toISOString()};
+      if(text.length<=CHUNK) meta.text=text;
+      else{const n=Math.ceil(text.length/CHUNK);meta.chunks=n;
+        for(let i=0;i<n;i++) await this.db.doc('files/'+f.id+'/chunks/'+String(i).padStart(4,'0')).set({text:text.slice(i*CHUNK,(i+1)*CHUNK)})}
+      /* a file that replaces a file keeps none of the old parts */
+      try{const q=await this.db.collection('files/'+f.id+'/chunks').limit(1000).get();
+        for(const d of q.docs) if(Number(d.id)>=(meta.chunks||0)) await this.db.doc('files/'+f.id+'/chunks/'+d.id).delete()}catch(_){}
+      await this.db.doc('files/'+f.id).set(meta);return true;
+    }catch(e){say(name+' could not be saved ('+(e&&e.code||'error')+'). '+(e&&e.message||''));return false}
+  },
+  async setEnabled(f,on){
+    if(!this.db){f.enabled=on;recompute();return}
+    try{await this.db.doc('files/'+f.id).update({enabled:on})}catch(e){say('The change could not be saved ('+(e&&e.code||'error')+').');renderFiles()}
+  },
+  async remove(f){
+    if(!this.db){FILES=FILES.filter(x=>x!==f);recompute();return}
+    try{await this.db.doc('files/'+f.id).delete();
+      const q=await this.db.collection('files/'+f.id+'/chunks').limit(1000).get();
+      for(const d of q.docs) await this.db.doc('files/'+f.id+'/chunks/'+d.id).delete();
+    }catch(e){say(f.name+' could not be removed ('+(e&&e.code||'error')+').')}
+  },
+  /* write the results where Claude can read them; only when the inputs changed */
+  lastKey:null,
+  async publish(){
+    const key=DepMap.VERSION+'|'+FILES.map(f=>f.id+'@'+f.key+(f.enabled?'+':'-')+(f.error?'!':'')).join(',');
+    if(key===this.lastKey) return;
+    try{
+      const ref=this.db.doc('graph/summary'),cur=await ref.get(),old=cur.exists?cur.data():{};
+      if(old.inputsKey===key){this.lastKey=key;return}
+      const ix=DepMap.index(D),ids=Object.keys(D.terms).sort((a,b)=>ix.tier[a]-ix.tier[b]||(a<b?-1:1));
+      const full=ids.length<=6000;
+      const rows=ids.map(id=>{const d=DepMap.describe(D,ix,id);const r={id,iri:d.iri,declaredIn:d.declaredIn,tier:d.tier};const lb=labelOf(id),cm=commentOf(id);if(lb) r.label=lb;if(cm) r.comment=cm.slice(0,1000);
+        const ty=(FX.subj.get(d.iri)||[]).filter(x=>x.p===DepMap.RDF+'type'&&x.o.t==='iri').map(x=>short(x.o.v));if(ty.length) r.types=ty;
+        if(d.unit.length>1) r.unit=d.unit;if(full){r.hasToHappenFirst=d.hasToHappenFirst;r.waitsForIt=d.waitsForIt.length}return r});
+      const pack=(items)=>{const out=[];let cur=[],size=0;for(const it of items){const n=JSON.stringify(it).length+1;if(size+n>60000&&cur.length){out.push(cur);cur=[];size=0}cur.push(it);size+=n}if(cur.length) out.push(cur);return out};
+      const tp=pack(rows),ep=pack(D.edges),name=(k,i)=>k+'-'+String(i).padStart(3,'0');
+      for(let i=0;i<tp.length;i++) await this.db.doc('graph/'+name('terms',i)).set({terms:tp[i]});
+      for(let i=0;i<ep.length;i++) await this.db.doc('graph/'+name('edges',i)).set({edges:ep[i].map(e=>({s:e[0],p:e[1],o:e[2],file:e[3]}))});
+      for(let i=tp.length;i<(old.termDocs||0);i++) await this.db.doc('graph/'+name('terms',i)).delete();
+      for(let i=ep.length;i<(old.edgeDocs||0);i++) await this.db.doc('graph/'+name('edges',i)).delete();
+      await ref.set({inputsKey:key,engine:DepMap.VERSION,computedAt:new Date().toISOString(),
+        files:FILES.map(f=>({id:f.id,name:f.name,enabled:f.enabled,triples:f.count,error:f.error||null})),
+        terms:ids.length,edges:D.edges.length,tiers:D.tiers.map(t=>({tier:t.tier,terms:t.groups.reduce((a,g)=>a+g.length,0)})),
+        cycles:D.cycles,termDocs:tp.length,edgeDocs:ep.length,hasToHappenFirstIncluded:full,
+        read:'graph/terms-NNN hold one entry per term, in tier order. graph/edges-NNN hold the edges. An open page writes these when the files change.'});
+      this.lastKey=key;
+    }catch(e){say('The results could not be saved for tool access ('+(e&&e.code||'error')+').')}
+  }
+};
+async function addFiles(list){
+  for(const file of list){
+    if(file.size>20*1024*1024){say(file.name+' is larger than 20 MB and was not added.');continue}
+    let text;try{text=await file.text()}catch(e){say(file.name+' could not be opened.');continue}
+    await Store.add(file.name,text);
+  }
+}
+
+/* One check box for each edge group in the loaded files. A reference group (rdfs:seeAlso and its subproperties) starts off. */
+const DASH=[['',''],['2 3',''],['','2.3'],['7 3','2.3'],['9 3 2 3',''],['2 3','2.3']];
+let LINE={};
+function renderKinds(){
+  const isRef={};for(const p in D.kinds) if(D.refs[p]) isRef[D.kinds[p]]=true;
+  const list=[...new Set(Object.values(D.kinds))].sort((a,b)=>(!!isRef[a])-(!!isRef[b])||(a<b?-1:1));
+  for(const k of list) if(!S.kset.has(k)){S.kset.add(k);if(!isRef[k]) S.kinds.add(k)}
+  const sig=list.join('|');const box=$('kinds');if(box.dataset.sig===sig) return;box.dataset.sig=sig;box.textContent='';LINE={};
+  let n=0;
+  for(const k of list){
+    LINE[k]=isRef[k]?['1 5','1']:DASH[n++%DASH.length];
+    const l=el('label');const c=el('input');c.type='checkbox';c.checked=S.kinds.has(k);
+    c.addEventListener('change',()=>{c.checked?S.kinds.add(k):S.kinds.delete(k);build();paint()});
+    l.appendChild(c);
+    const s=document.createElementNS(NS,'svg');s.setAttribute('width','22');s.setAttribute('height','8');
+    s.innerHTML='<line x1="0" y1="4" x2="22" y2="4" stroke="currentColor" stroke-width="'+(LINE[k][1]||1.3)+'" stroke-dasharray="'+LINE[k][0]+'"/>';
+    const members=Object.keys(D.kinds).filter(p=>D.kinds[p]===k&&p!==k);
+    l.appendChild(s);l.appendChild(document.createTextNode(k+(members.length?' ('+members.join(', ')+')':'')));box.appendChild(l)}
+}
+$('q').addEventListener('change',e=>{const v=e.target.value.trim();if(v)pick(v,false,true)});
+$('reach-all').addEventListener('click',()=>setReach('all'));$('reach-direct').addEventListener('click',()=>setReach('direct'));
+$('p-root').addEventListener('click',()=>{const r=rootUnit();if(r){S.auto=false;S.sel=new Set(r);$('q').value='';paint();focusTerm(r[0])}});
+$('p-clear').addEventListener('click',()=>{S.auto=false;S.sel=new Set();$('q').value='';paint();focusTerm(null)});
+for(const t of ['map','api','notes']) $('tab-'+t).addEventListener('click',()=>showTab(t));
+$('add-btn').addEventListener('click',()=>$('file-input').click());
+$('file-input').addEventListener('change',e=>{addFiles([...e.target.files]);e.target.value=''});
+$('paste-btn').addEventListener('click',()=>{$('paste').hidden=false;$('paste-name').focus()});
+$('paste-cancel').addEventListener('click',()=>{$('paste').hidden=true});
+$('paste').addEventListener('submit',async e=>{e.preventDefault();const name=$('paste-name').value.trim(),text=$('paste-text').value;
+  if(!name){say('Give the pasted text a file name.');$('paste-name').focus();return}
+  if(!text.trim()){say('Paste the text of the file first.');return}
+  if(await Store.add(name,text)){$('paste-text').value='';$('paste-name').value='';$('paste').hidden=true}});
+let dragN=0;
+document.addEventListener('dragenter',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){dragN++;document.body.classList.add('drag')}});
+document.addEventListener('dragleave',()=>{if(--dragN<=0){dragN=0;document.body.classList.remove('drag')}});
+document.addEventListener('dragover',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')) e.preventDefault()});
+document.addEventListener('drop',e=>{if(!e.dataTransfer||!e.dataTransfer.files.length) return;e.preventDefault();dragN=0;document.body.classList.remove('drag');if(Store.canWrite){showTab('map');addFiles([...e.dataTransfer.files])}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sheet.state==='open'){openSheet(false);return}if(e.key==='Escape'&&S.sel.size&&!$('view-map').hidden&&!/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)){S.sel=new Set();$('q').value='';paint();focusTerm(null)}});
+for(const c of document.querySelectorAll('#view-notes code')){const id=c.textContent.trim();
+  if(/^[a-z]+:\w+$/.test(id)){c.setAttribute('role','button');c.tabIndex=0;const go=()=>{showTab('map');pick(id,false,true);window.scrollTo(0,0)};
+    c.addEventListener('click',go);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}})}}
+for(const k of ['rdf','rdfs','owl','foaf']){const n=$('n-'+k);if(n)n.textContent={rdf:127,rdfs:87,owl:450,foaf:631}[k]}
+renderFiles();side();
+new ResizeObserver(()=>draw()).observe($('map'));
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(draw);
+Store.init();
+
+/* ---------- the operations of the page ----------
+   The operations of Tool access and depmap-cli.js (the summary, the build order, the answer for a term) and the files
+   themselves: read the text of a file, write a file (new or changed), remove a file. Writing or removing a file computes the map again.
+   Claude in the page runs code in the page, so it has these and every other part of the page. */
+const DepMapAPI=(()=>{
+  let ixFor=null,ix=null;
+  const idx=()=>{if(ixFor!==D){ix=DepMap.index(D);ixFor=D}return ix};
+  const vis=id=>!S.hidden.has(vocabOf(id));
+  const find=t=>{t=String(t||'').trim();if(D.terms[t]) return t;const i=t.replace(/^<|>$/g,'');return IRI2ID.get(i)};
+  const val=(o,file,d)=>o.t==='iri'?short(o.v):o.t==='lit'?JSON.stringify(o.v)+(o.l?'@'+o.l:''):d>6?'[]':'[ '+(FX.bn.get(file+'\u0000'+o.v)||[]).map(t=>short(t.p)+' '+val(t.o,file,d+1)).join(' ; ')+' ]';
+  const file=n=>{const f=FILES.find(x=>x.name===n||x.id===n);if(!f) throw new Error('No loaded file is named '+n+'. Loaded: '+FILES.map(x=>x.name).join(', '));return f};
+  /* wait until the page has read the saved file again and computed the map */
+  const settle=async test=>{for(let i=0;i<100&&!test();i++) await new Promise(r=>setTimeout(r,100))};
+  return {
+    visible:vis,
+    summary(){
+      const all=[...new Set(Object.keys(D.terms).map(vocabOf))].sort();
+      return {files:FILES.map(f=>({name:f.name,enabled:f.enabled,format:f.format,triples:f.count,chars:f.text?f.text.length:null,error:f.error||null})),
+        terms:Object.keys(D.terms).length,edges:D.edges.length,
+        tiers:D.tiers.map(t=>({tier:t.tier,terms:t.groups.reduce((a,g)=>a+g.length,0)})),
+        cycles:D.cycles,show:{on:all.filter(v=>!S.hidden.has(v)),off:all.filter(v=>S.hidden.has(v))},selected:[...S.sel]};
+    },
+    order(){return D.tiers.flatMap(t=>t.groups.map(u=>({tier:t.tier,unit:u})))},
+    term(id){
+      const k=find(id);if(!k) throw new Error('No term with this name in the loaded files: '+id);
+      const d=DepMap.describe(D,idx(),k);
+      return {id:k,iri:d.iri,declaredIn:d.declaredIn,tier:d.tier,unit:d.unit,label:labelOf(k),comment:commentOf(k),
+        statements:(FX.subj.get(d.iri)||[]).map(t=>({property:short(t.p),value:val(t.o,t.file,0),file:t.file})),
+        hasToHappenFirst:d.hasToHappenFirst,waitsForIt:d.waitsForIt};
+    },
+    termsIn(name){const f=file(name);return Object.keys(D.terms).filter(id=>D.terms[id].f.includes(f.name)).sort()},
+    find(text){const q=String(text||'').toLowerCase();return Object.keys(D.terms).filter(id=>id.toLowerCase().includes(q)||D.terms[id].i.toLowerCase().includes(q)||labelOf(id).toLowerCase().includes(q)).sort()},
+    select(ids){ids=[].concat(ids).map(find).filter(Boolean);if(!ids.length) return [];showTab('map');pick(ids[0],false,true);for(const id of ids.slice(1)) pick(id,true,false);return [...S.sel]},
+    files(){return FILES.map(f=>f.name)},
+    readFile(name){const f=file(name);if(typeof f.text!=='string') throw new Error(name+' has no text in this view.');return f.text},
+    /* a new file, or the new text of a loaded file */
+    async writeFile(name,text){
+      name=String(name).trim();text=String(text);
+      const test=parseInto({name,format:null},text);if(test.error) throw new Error(name+': '+test.error);
+      const r=await Store.add(name,text);if(!r) throw new Error(name+' was not saved: '+$('status').textContent);
+      await settle(()=>FILES.some(x=>x.name===name&&x.text===text));
+      return {name,triples:test.count};
+    },
+    async removeFile(name){const f=file(name);await Store.remove(f);await settle(()=>!FILES.includes(f));return {removed:f.name}},
+    async enableFile(name,on){const f=file(name);await Store.setEnabled(f,on!==false);await settle(()=>f.enabled===(on!==false)||!FILES.includes(f));return {name:f.name,enabled:on!==false}},
+    /* Outside the page. The project files can be read (the platform gives no write to them). A file goes out to the
+       viewer's computer with a save that the viewer confirms. Each file in the map is also in this page's database,
+       under files/<name>, where Claude in a project thread reads and writes it. */
+    async projectList(path,recursive){const f=await (window.claude&&window.claude.use?window.claude.use('files'):null);if(!f) throw new Error('The project files cannot be reached in this view.');
+      const out=[];let cursor;do{const r=await f.list({path:path||undefined,recursive:!!recursive,cursor});out.push(...r.entries);cursor=r.cursor}while(cursor&&out.length<5000);return out},
+    async projectRead(path){const f=await (window.claude&&window.claude.use?window.claude.use('files'):null);if(!f) throw new Error('The project files cannot be reached in this view.');
+      let off=0,parts=[],size=1;while(off<size){const r=await f.read(path,{offset:off});parts.push(r.bytes);size=r.size;off+=r.bytes.length;if(!r.bytes.length) break}
+      const all=new Uint8Array(parts.reduce((a,b)=>a+b.length,0));let k=0;for(const p of parts){all.set(p,k);k+=p.length}return new TextDecoder().decode(all)},
+    async loadProjectFile(path,name){const text=await this.projectRead(path);return this.writeFile(name||path.split('/').pop(),text)},
+    async saveToComputer(name){const d=await (window.claude&&window.claude.use?window.claude.use('downloads'):null);if(!d) throw new Error('Saving files is not available in this view.');
+      const f=file(name);if(typeof f.text!=='string') throw new Error(name+' has no text in this view.');
+      /* the platform saves only some file types, not .ttl, .nt or .rdf, but it saves .zip: such a file goes out
+         in a zip archive that holds it under its own name, unchanged */
+      try{return await d.save({filename:f.name,data:f.text})}
+      catch(e){if(e&&e.code==='rejected_extension') return d.save({filename:f.name+'.zip',data:zipOf([[f.name,f.text]])});throw e}},
+    /* parse Turtle, N-Triples or RDF/XML text into triples, and write triples as Turtle */
+    parse(name,text){return DepMap.parse(name,text,null,ENV)},
+    turtle(triples,prefixes){
+      const N=window.N3,DF=N.DataFactory,w=new N.Writer({prefixes:prefixes||{}});
+      const t=x=>x.t==='iri'?DF.namedNode(x.v):x.t==='bnode'?DF.blankNode(x.v):DF.literal(x.v,x.l||(x.d?DF.namedNode(x.d):undefined));
+      for(const q of triples) w.addQuad(t(q.s),DF.namedNode(q.p),t(q.o));
+      return new Promise((ok,no)=>w.end((e,r)=>e?no(e):ok(r)));
+    }
+  };
+})();
+window.DepMapAPI=DepMapAPI;
+
+/* ---------- Claude inside the page ----------
+   One tool: run JavaScript in the page. The code sees DepMapAPI (as api), the analysis engine DepMap, the N3 library,
+   and the state of the page: FILES, D (the map), FX (every statement, indexed), S (the controls). */
+const AsyncFn=Object.getPrototypeOf(async function(){}).constructor;
+const Ask={sample:null,turns:[],busy:null,
+  tools(step){
+    return [{name:'run',
+      description:'Run JavaScript in the page and get what it returns (JSON, at most 30000 characters; slice a larger value and run again). The code is the body of an async function: use await and return. It has the whole page: api (DepMapAPI), DepMap, N3, FILES, D, FX, S and each other global of the page.',
+      inputSchema:{type:'object',properties:{code:{type:'string'}},required:['code']},
+      execute:async a=>{const code=String(a&&a.code||'');step(code);
+        const v=await new AsyncFn('api',code)(DepMapAPI);
+        let s;try{s=typeof v==='string'?v:JSON.stringify(v===undefined?null:v)}catch(e){s=String(v)}
+        return s.length>30000?s.slice(0,30000)+'\n[cut at 30000 of '+s.length+' characters]':s}}];
+  },
+  frame(){
+    const how=document.querySelector('#view-api section.prose:last-of-type p');
+    return 'You work inside the SemanticKit Dependency Map page, for the person who owns it. The page has loaded RDF files and computed a map from them. How the page makes the map: '+(how?how.textContent.trim():'')+
+      '\nYou have the whole page through the run tool. Read the files and the map, and change the files: api.readFile(name) gives the text of a loaded file, api.writeFile(name, text) saves a new file or the new text of a loaded file and computes the map again, api.removeFile(name) removes one. api.termsIn(name) lists the terms a file declares, and D.terms[id].f lists the files that declare a term. Other parts of api: summary(), order(), term(id), find(text), select(ids) (select terms on the map), files(), enableFile(name, on), parse(name, text) and turtle(triples, prefixes). '+
+      'Outside the page: api.projectList(path, recursive) and api.projectRead(path) read the project files (read only), api.loadProjectFile(path, name) loads one into the map, and api.saveToComputer(name) offers a loaded file to the person to save on their computer (a .ttl goes in a .zip, since the platform does not save .ttl). Each loaded file is also kept in this page\'s database under files/<name>, where Claude in the project threads can read it and write it. '+
+      'The web: the run tool can call fetch(url) for any URL. If the page\'s security policy blocks a site, fetch throws; then try the same file through https://cdn.jsdelivr.net/gh/<owner>/<repo>@<branch>/<path> (files in GitHub repositories, such as the W3C specifications) or https://cdn.jsdelivr.net/npm/<package>/<path>, and say plainly what was blocked. A fetched Turtle file can be loaded into the map with api.writeFile(name, text).\n'+
+      'Find out from the files what you need to know, and do the work the person asks for. When you have changed a file, say what you changed. Name terms by their ids, such as rdfs:Class. Answer in plain text, with no Markdown.';
+  },
+  state(){return 'Page now: files '+(FILES.map(f=>f.name+(f.enabled?'':' (off)')).join(', ')||'none')+'. Selected '+(S.sel.size?[...S.sel].join(', '):'nothing')+'. Show turns off: '+(S.hidden.size?[...S.hidden].map(v=>v===''?'(no prefix)':v).join(', '):'nothing')+'.'},
+  turn(who,text){const d=el('div','ask-turn '+who);d.appendChild(el('div','who',who==='you'?'You':'Claude'));const m=el('div','msg',text);d.appendChild(m);const s=el('div','steps');d.appendChild(s);$('ask-log').appendChild(d);$('ask-log').scrollTop=1e9;return {m,s}},
+  /* each term name in the answer that the loaded files have becomes a link to the term */
+  link(m,text){m.textContent='';const re=/<[^>\s]+>|[A-Za-z_][\w.\-]*:[\w\-]+(?:\.[\w\-]+)*|:[\w\-]+/g;let at=0,x;
+    while((x=re.exec(text))){const tok=x[0],id=D.terms[tok]?tok:IRI2ID.get(tok.replace(/^<|>$/g,''));if(!id||!(id in G.tier)) continue;
+      m.appendChild(document.createTextNode(text.slice(at,x.index)));const b=el('button','tlink',tok);b.type='button';b.addEventListener('click',()=>pick(id,false,true));m.appendChild(b);at=x.index+tok.length}
+    m.appendChild(document.createTextNode(text.slice(at)))},
+  async send(q){
+    if(this.busy||!q) return;
+    this.turn('you',q);const out=this.turn('claude','Thinking…');
+    const ctl=new AbortController();this.busy=ctl;$('ask-send').disabled=true;$('ask-stop').hidden=false;
+    const steps=[],step=s=>{steps.push(s.length>160?s.slice(0,160)+'…':s);out.s.textContent='Ran: '+steps.join(' · ')};
+    const user={role:'user',content:(this.turns.length?'':this.frame()+'\n\n')+this.state()+'\n\nQuestion: '+q};
+    try{
+      const r=await this.sample(this.turns.concat(user),{tools:this.tools(step),signal:ctl.signal,cache:false,onText:({text})=>{out.m.textContent=text}});
+      this.link(out.m,r.text);if(r.truncated) out.s.textContent+=(steps.length?'\n':'')+'The answer stops early, at the length limit.';
+      this.turns.push(user,{role:'assistant',content:r.text});
+    }catch(e){
+      const code=e&&e.code;if(e&&e.text) this.link(out.m,e.text);else out.m.textContent='';
+      const why={cancelled:'Stopped.',not_granted:'Claude is not allowed for this page.',rate_limited:'Claude is busy. Ask again in a minute.',tools_unavailable:'This view cannot let Claude run code in the page.'}[code]||('Claude could not answer ('+(code||'error')+').');
+      out.s.textContent=(steps.length?'Ran: '+steps.join(' · ')+'\n':'')+why;
+      if(code==='not_granted') $('ask').hidden=true;
+    }finally{this.busy=null;$('ask-send').disabled=false;$('ask-stop').hidden=true}
+  },
+  async init(){
+    let s=null;try{s=window.claude&&window.claude.use?await window.claude.use('sample'):null}catch(_){}
+    if(!s) return;
+    let lim=null;try{lim=await s.limits()}catch(_){}
+    if(!lim||!lim.tools) return;
+    this.sample=s;$('ask').hidden=false;
+  }
+};
+$('ask-form').addEventListener('submit',e=>{e.preventDefault();const q=$('ask-q').value.trim();if(!q) return;$('ask-q').value='';Ask.send(q)});
+$('ask-q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('ask-form').requestSubmit()}});
+$('ask-stop').addEventListener('click',()=>{if(Ask.busy) Ask.busy.abort()});
+$('ask-new').addEventListener('click',()=>{if(Ask.busy) Ask.busy.abort();Ask.turns=[];$('ask-log').textContent=''});
+Ask.init();
+document.addEventListener('click',e=>{for(const d of document.querySelectorAll('details.pop[open]')) if(!d.contains(e.target)) d.open=false});
+</script>
+
+</body></html>

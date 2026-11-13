@@ -1,0 +1,16 @@
+{
+  "name": "semantickit-dependency-map",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SemanticKit Dependency Map: a local web app with an MCP server",
+  "type": "commonjs",
+  "bin": { "semantickit-depmap": "server.js" },
+  "scripts": { "start": "node server.js", "test": "node test/smoke.js" },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@xmldom/xmldom": "0.9.12",
+    "n3": "1.17.2",
+    "zod": "4.6.7"
+  }
+}
