@@ -82,3 +82,7 @@ The analysis is `depmap-core.js`. The page, the MCP server and the command line 
 | `depmap-core.js` | The analysis. |
 | `depmap-cli.js` | The command line. |
 | `test/smoke.js` | `npm test`: starts the app, connects an MCP client over HTTP and over standard input and output, and checks the answers against `depmap-cli.js` on `test/inputs/`. |
+
+## Licence
+
+GNU General Public License, version 2 only (GPL-2.0-only). The text is in `LICENSE`.
