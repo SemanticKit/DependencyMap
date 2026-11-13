@@ -1,7 +1,6 @@
 {
   "name": "semantickit-dependency-map",
   "version": "1.0.0",
-  "private": true,
   "license": "GPL-2.0-only",
   "description": "SemanticKit Dependency Map: a local web app with an MCP server",
   "type": "commonjs",

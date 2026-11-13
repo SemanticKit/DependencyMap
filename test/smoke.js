@@ -54,10 +54,11 @@ async function check(client, label) {
 
 (async () => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), 'depmap-test-'));
-  fs.mkdirSync(path.join(data, 'files'));
-  for (const n of names) fs.copyFileSync(path.join(inputs, n), path.join(data, 'files', n));
+  const rdf = path.join(data, 'rdf');
+  fs.mkdirSync(rdf);
+  for (const n of names) fs.copyFileSync(path.join(inputs, n), path.join(rdf, n));
   const port = 4900 + Math.floor(Math.random() * 500);
-  const a = createApp({ data, port });
+  const a = createApp({ data, port, vocabularies: rdf });
   await new Promise(ok => a.httpServer.listen(port, '127.0.0.1', ok));
   try {
     const http = new Client({ name: 'smoke', version: '1' });
@@ -65,7 +66,7 @@ async function check(client, label) {
     await check(http, 'HTTP');
     await http.close();
     const stdio = new Client({ name: 'smoke', version: '1' });
-    await stdio.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(app, 'server.js'), '--stdio', '--data', data, '--port', String(port)], stderr: 'ignore' }));
+    await stdio.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(app, 'server.js'), '--stdio', '--vocabularies', rdf, '--data', data, '--port', String(port)], stderr: 'ignore' }));
     await check(stdio, 'stdio');
     await stdio.close();
   } finally { a.close(); fs.rmSync(data, { recursive: true, force: true }); }
