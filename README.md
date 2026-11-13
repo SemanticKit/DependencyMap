@@ -23,8 +23,6 @@ The app answers only on `localhost`, and only to requests from its own page or f
 | Option | Environment variable | Default | Meaning |
 | --- | --- | --- | --- |
 | `--port <n>` | `DEPMAP_PORT` | `4787` | The port of the page and of `/mcp`. |
-| `--data <folder>` | `DEPMAP_DATA` | the folder the app is started in | Where `.semantickit.json` is kept. |
-| `--vocabularies <folder>` | `DEPMAP_VOCABULARIES` | | Read the RDF files of this folder in place, such as a project's own inputs. Nothing is copied. |
 | `--stdio` | | | Serve MCP on standard input and output instead of `/mcp`. The page is served too when the port is free. |
 
 ## Connect an MCP client
@@ -62,7 +60,7 @@ A term is named by its compact id, such as `owl:Class`, or by its IRI in angle b
 
 ## Files
 
-The vocabularies are read in place from the folder given with `--vocabularies`; the app never copies them. `.semantickit.json`, in the folder the app is started in, records which vocabularies are on. It is written the first time one is switched or added.
+Start the app in a project. It reads each RDF file anywhere under the project's `docs` folder. A file that is loaded goes to `docs/<alias>/<name>`, where the alias is the prefix of its ontology, such as `docs/owl/owl.ttl`; the app makes the folders. `.semantickit.json`, in the project folder, records which files are on. It is written the first time one is switched or added.
 
 ## How the map is made
 
