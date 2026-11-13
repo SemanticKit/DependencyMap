@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 /* SemanticKit Dependency Map, local app.
-   node server.js --vocabularies <folder> [--port 4787] [--data <folder>] [--stdio]
+   node server.js [--port 4787] [--stdio]
    Serves the map page at http://localhost:<port>/ and an MCP server at http://localhost:<port>/mcp
    (Streamable HTTP). With --stdio the MCP server is on standard input and output instead, and the page
-   is served too when the port is free. The RDF files of the map are read in place from
-   the folder given with --vocabularies. The app creates no folder for them. */
+   is served too when the port is free. The app is started in a project. It reads each RDF file under the
+   docs folder of the project, and it creates the folders it needs there. */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -18,12 +18,10 @@ const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio
 const CHUNK = 80000; /* the size of the parts the page reads a file in */
 
 function options(argv) {
-  const o = { port: Number(process.env.DEPMAP_PORT) || 4787, data: process.env.DEPMAP_DATA || process.cwd(), vocabularies: process.env.DEPMAP_VOCABULARIES || null, stdio: false, host: '127.0.0.1' };
+  const o = { port: Number(process.env.DEPMAP_PORT) || 4787, data: process.cwd(), stdio: false, host: '127.0.0.1' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--port') o.port = Number(argv[++i]);
-    else if (a === '--data') o.data = argv[++i];
-    else if (a === '--vocabularies') o.vocabularies = argv[++i];
     else if (a === '--stdio') o.stdio = true;
     else if (a === '-h' || a === '--help') o.help = true;
     else { o.bad = a; }
@@ -31,8 +29,8 @@ function options(argv) {
   return o;
 }
 
-function createApp({ data, port, vocabularies }) {
-  const store = new Store(data, vocabularies);
+function createApp({ data, port }) {
+  const store = new Store(data);
   const map = new DependencyMap(store);
   const clients = new Set(); /* open pages: server-sent event streams */
   const generic = new Map(); /* documents other than files/, such as graph/summary: kept while the app runs */
@@ -165,7 +163,6 @@ function createApp({ data, port, vocabularies }) {
 async function main() {
   const o = options(process.argv.slice(2));
   if (o.help || o.bad) { (o.bad ? console.error : console.log)(fs.readFileSync(__filename, 'utf8').split('\n').slice(2, 7).join('\n').replace(/^\/\* ?| ?\*\/$|^   /gm, '')); process.exit(o.bad ? 1 : 0); }
-  if (!o.vocabularies) { console.error("Give the folder of vocabularies: --vocabularies <folder>"); process.exit(1); }
   const log = (...a) => console.error(...a); /* stdout is the MCP channel with --stdio */
   const app = createApp(o);
   const listening = await new Promise(ok => {

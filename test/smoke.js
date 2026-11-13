@@ -14,6 +14,7 @@ const { createApp } = require('../server.js');
 const app = path.join(__dirname, '..');
 const inputs = path.join(__dirname, 'inputs');
 const names = ['rdf.ttl', 'rdfs.ttl', 'rdf-xsd.ttl', 'owl.ttl'];
+let docs; /* the docs folder of the test project */
 
 async function check(client, label) {
   const call = async (name, args) => {
@@ -39,6 +40,7 @@ async function check(client, label) {
   assert.strictEqual(await call('read_file', { name: 'rdfs.ttl' }), fs.readFileSync(path.join(inputs, 'rdfs.ttl'), 'utf8'));
   const added = await call('write_file', { name: 'extra.ttl', text: '@prefix ex: <http://example.org/> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\nex:A a rdfs:Class ; rdfs:subClassOf ex:B .\nex:B a rdfs:Class .\n' });
   assert.strictEqual(added.triples, 3);
+  assert(fs.existsSync(path.join(docs, 'ex', 'extra.ttl')), 'a new file goes to docs/<alias>/<name>');
   const a = await call('term', { id: 'ex:A' });
   assert(a.hasToHappenFirst.includes('ex:B') && a.hasToHappenFirst.includes('rdfs:Class'), 'ex:A');
   await call('enable_file', { name: 'extra.ttl', enabled: false });
@@ -53,20 +55,26 @@ async function check(client, label) {
 }
 
 (async () => {
+  /* an empty project: the app makes docs and the folder of each ontology when a file is loaded */
   const data = fs.mkdtempSync(path.join(os.tmpdir(), 'depmap-test-'));
-  const rdf = path.join(data, 'rdf');
-  fs.mkdirSync(rdf);
-  for (const n of names) fs.copyFileSync(path.join(inputs, n), path.join(rdf, n));
+  docs = path.join(data, 'docs');
   const port = 4900 + Math.floor(Math.random() * 500);
-  const a = createApp({ data, port, vocabularies: rdf });
+  const a = createApp({ data, port });
   await new Promise(ok => a.httpServer.listen(port, '127.0.0.1', ok));
   try {
     const http = new Client({ name: 'smoke', version: '1' });
     await http.connect(new StreamableHTTPClientTransport(new URL('http://localhost:' + port + '/mcp')));
+    assert(!fs.existsSync(docs), 'nothing is made before a file is loaded');
+    for (const n of names) {
+      const r = await http.callTool({ name: 'load_file', arguments: { path: path.join(inputs, n) } });
+      assert(!r.isError, 'load_file ' + n + ': ' + (r.content[0] && r.content[0].text));
+    }
+    for (const [folder, n] of [['rdf', 'rdf.ttl'], ['rdfs', 'rdfs.ttl'], ['xsd', 'rdf-xsd.ttl'], ['owl', 'owl.ttl']])
+      assert(fs.existsSync(path.join(docs, folder, n)), n + ' is in docs/' + folder);
     await check(http, 'HTTP');
     await http.close();
     const stdio = new Client({ name: 'smoke', version: '1' });
-    await stdio.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(app, 'server.js'), '--stdio', '--vocabularies', rdf, '--data', data, '--port', String(port)], stderr: 'ignore' }));
+    await stdio.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(app, 'server.js'), '--stdio', '--port', String(port)], cwd: data, stderr: 'ignore' }));
     await check(stdio, 'stdio');
     await stdio.close();
   } finally { a.close(); fs.rmSync(data, { recursive: true, force: true }); }
