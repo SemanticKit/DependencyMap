@@ -24,7 +24,12 @@ async function check(client, label) {
     try { return JSON.parse(t); } catch (_) { return t; }
   };
   const tools = (await client.listTools()).tools.map(t => t.name).sort();
-  assert.deepStrictEqual(tools, ['enable_file', 'files', 'find', 'load_file', 'order', 'read_file', 'remove_file', 'select', 'summary', 'term', 'terms_in', 'write_file']);
+  const where = await call('environment');
+  assert(where.docs.endsWith('/docs'), 'environment gives the docs folder');
+  assert(typeof where.PROJECT_DIR === 'string' && where.PROJECT_DIR.startsWith('/'), 'environment gives the project root');
+  for (const v of [where.folder, where.docs]) assert(v.startsWith('/') || v.startsWith('$PROJECT_DIR'), 'a path is whole or starts at the root');
+  assert(where.env && typeof where.env.PATH === 'string', 'environment gives the variables');
+  assert.deepStrictEqual(tools, ['enable_file', 'environment', 'files', 'find', 'load_file', 'order', 'read_file', 'remove_file', 'select', 'summary', 'term', 'terms_in', 'write_file']);
   const cli = JSON.parse(execFileSync(process.execPath, [path.join(app, 'depmap-cli.js'), ...names.map(n => path.join(inputs, n)), '--json'], { maxBuffer: 1 << 28 }));
   const sum = await call('summary');
   assert.strictEqual(sum.terms, Object.keys(cli.terms).length, 'terms');

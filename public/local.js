@@ -41,4 +41,39 @@ const caps={db,user,downloads};
 window.claude={use:async name=>caps[name]||null};
 /* the port the app runs on, in the Tool access text */
 document.addEventListener('DOMContentLoaded',()=>{for(const e of document.querySelectorAll('.port-here')) e.textContent=location.port||'80'});
+/* The info button in the header: a window with the folder, the process and the environment variables the app runs in. */
+document.addEventListener('DOMContentLoaded',()=>{
+  const header=document.querySelector('header');if(!header) return;
+  const btn=document.createElement('button');
+  btn.type='button';btn.className='btn';btn.id='env-btn';btn.textContent='i';
+  btn.title='What the app runs in';btn.setAttribute('aria-label','What the app runs in');
+  btn.style.cssText='border-radius:50%;width:28px;height:28px;padding:0;font-style:italic;font-family:serif;font-weight:700';
+  const dlg=document.createElement('dialog');
+  dlg.id='env-dlg';dlg.style.cssText='max-width:min(900px,92vw);width:92vw;max-height:86vh;padding:0;border:1px solid #8884;border-radius:10px';
+  const row=(k,v)=>{const tr=document.createElement('tr');
+    const a=document.createElement('td'),b=document.createElement('td');
+    a.textContent=k;b.textContent=v;
+    a.style.cssText='padding:3px 12px 3px 0;white-space:nowrap;vertical-align:top;font-family:ui-monospace,monospace;font-size:12px';
+    b.style.cssText='padding:3px 0;word-break:break-all;font-family:ui-monospace,monospace;font-size:12px';
+    tr.append(a,b);return tr};
+  btn.addEventListener('click',async()=>{
+    dlg.textContent='';
+    const head=document.createElement('div');
+    head.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #8884;position:sticky;top:0;background:Canvas';
+    const title=document.createElement('b');title.textContent='What the app runs in';
+    const close=document.createElement('button');close.type='button';close.className='btn';close.textContent='Close';
+    close.addEventListener('click',()=>dlg.close());
+    head.append(title,close);
+    const bodyEl=document.createElement('div');bodyEl.style.cssText='padding:12px 16px;overflow:auto;max-height:calc(86vh - 60px)';
+    const table=document.createElement('table');table.style.borderCollapse='collapse';
+    try{
+      const j=await api('GET','/api/env');
+      for(const [k,v] of [['PROJECT_DIR',j.PROJECT_DIR],['taken from',j.from],['folder',j.folder],['docs',j.docs],['process',String(j.pid)],['node',j.node]]) table.append(row(k,v));
+      const gap=document.createElement('tr');const g=document.createElement('td');g.colSpan=2;g.style.cssText='padding:10px 0 4px;font-weight:600';
+      g.textContent='Environment variables ('+Object.keys(j.env).length+')';gap.append(g);table.append(gap);
+      for(const k of Object.keys(j.env)) table.append(row(k,j.env[k]));
+    }catch(e){table.append(row('error',e.message))}
+    bodyEl.append(table);dlg.append(head,bodyEl);
+    if(!dlg.open) dlg.showModal()});
+  header.append(btn);document.body.append(dlg)});
 })();
