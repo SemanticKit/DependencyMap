@@ -17,8 +17,18 @@ const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio
 
 const CHUNK = 80000; /* the size of the parts the page reads a file in */
 
+/* The root of the project: the nearest folder, from the one the app is started in upwards, that holds .git.
+   The app runs no program to find it. Where no folder holds .git, it is the folder the app is started in. */
+function projectRoot() {
+  const start = process.cwd();
+  for (let dir = start; ; dir = path.dirname(dir)) {
+    if (fs.existsSync(path.join(dir, '.git'))) return dir;
+    if (dir === path.dirname(dir)) return start;
+  }
+}
+
 function options(argv) {
-  const o = { port: Number(process.env.DEPMAP_PORT) || 4787, data: process.cwd(), stdio: false, host: '127.0.0.1' };
+  const o = { port: Number(process.env.DEPMAP_PORT) || 4787, data: projectRoot(), stdio: false, host: '127.0.0.1' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--port') o.port = Number(argv[++i]);
@@ -104,6 +114,7 @@ function createApp({ data, port }) {
     '/local.js': [path.join(pub, 'local.js'), 'text/javascript; charset=utf-8'],
     '/depmap-core.js': [path.join(__dirname, 'depmap-core.js'), 'text/javascript; charset=utf-8'],
     '/vendor/n3.min.js': [require.resolve('n3/browser/n3.min.js'), 'text/javascript; charset=utf-8'],
+    '/vendor/d3.min.js': [path.join(path.dirname(require.resolve('d3')), '..', 'dist', 'd3.min.js'), 'text/javascript; charset=utf-8'],
   };
 
   /* Only this computer, by its own name: no other origin can call the app (DNS rebinding, cross-site requests). */
@@ -144,6 +155,11 @@ function createApp({ data, port }) {
       req.on('close', () => { clearInterval(ping); clients.delete(res); });
       return;
     }
+    if (u.pathname === '/api/env' && req.method === 'GET') {
+      /* what the app runs in, for the info window of the page */
+      out(res, 200, map.environment());
+      return;
+    }
     try {
       if (u.pathname === '/api/doc' && req.method === 'GET') { const d = getDoc(u.searchParams.get('path')); out(res, 200, { exists: d !== null, data: d }); return; }
       if (u.pathname === '/api/collection' && req.method === 'GET') { out(res, 200, { docs: listCol(u.searchParams.get('path'), Number(u.searchParams.get('limit')) || 1000) }); return; }
@@ -160,7 +176,29 @@ function createApp({ data, port }) {
   return { store, map, pages, httpServer, close() { for (const c of clients) c.end(); store.close(); httpServer.close(); } };
 }
 
+/* The names of the project, as its .envrc gives them to a shell: .env first, then PROJECT_DIR, the root of
+   the project, then the file of the client that started the app, .env.<client>, as an override. A name whose
+   value comes out empty is left as it was. */
+function loadEnv(root) {
+  const e = process.env;
+  const read = name => {
+    let text;
+    try { text = fs.readFileSync(path.join(root, name), 'utf8'); } catch (_) { return; }
+    for (const line of text.split('\n')) {
+      const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+      if (!m) continue;
+      const value = m[2].replace(/^"(.*)"$/, '$1').replace(/\$\{(\w+)\}/g, (_, k) => e[k] || '');
+      if (value) e[m[1]] = value;
+    }
+  };
+  read('.env');
+  e.PROJECT_DIR = root;
+  const client = e.CLAUDECODE ? 'claude' : e.XCODE_VERSION_ACTUAL ? 'xcode' : e.TERM_PROGRAM === 'vscode' ? 'vscode' : e.INSIDE_EMACS ? 'emacs' : null;
+  if (client) read('.env.' + client);
+}
+
 async function main() {
+  loadEnv(projectRoot());
   const o = options(process.argv.slice(2));
   if (o.help || o.bad) { (o.bad ? console.error : console.log)(fs.readFileSync(__filename, 'utf8').split('\n').slice(2, 7).join('\n').replace(/^\/\* ?| ?\*\/$|^   /gm, '')); process.exit(o.bad ? 1 : 0); }
   const log = (...a) => console.error(...a); /* stdout is the MCP channel with --stdio */

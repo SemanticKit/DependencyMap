@@ -82,6 +82,16 @@ button:focus-visible,input:focus-visible,summary:focus-visible,[role="button"]:f
 .e.k-mod{stroke-dasharray:1 5;stroke-width:1}
 .e.far{opacity:.2}
 .e.near{opacity:.85}
+#onion-wrap{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+#onion-wrap[hidden]{display:none}
+#legend{font:12px/1.7 var(--f-mono);max-height:calc(100vh - 220px);overflow:auto;white-space:nowrap;padding-right:4px}
+#legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+#onion{color:var(--ink)}
+#onion svg{display:block;width:100%;height:calc(100vh - 220px);min-height:420px}
+/* with nothing selected, a D3 view has no side panel and takes the whole width */
+.main.solo{grid-template-columns:minmax(0,1fr)}
+.main.solo>.right{display:none}
+.wrap:has(#onion-wrap:not([hidden])){max-width:none}
 .side{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:16px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);max-height:calc(100vh - 24px);overflow:auto;box-sizing:border-box}
 .side h2{font-family:var(--f-mono);font-size:1.1rem;overflow-wrap:anywhere;margin-bottom:6px}
 .key{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;font-size:12px}
@@ -231,7 +241,8 @@ header h1{font-size:1.35rem}
 .wrap{padding-block:16px 64px;gap:12px}
 #view-map{gap:12px!important}
 .bar{padding:8px 10px;gap:8px;align-items:center;position:relative;z-index:20}
-.bar>input[type="text"]{font:14px var(--f-mono);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink);width:260px;max-width:100%;box-sizing:border-box}
+.bar>select{font:500 13px var(--f-body);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--panel);color:var(--ink);max-width:260px}
+.bar>input[type="search"]{font:14px var(--f-mono);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink);width:260px;max-width:100%;box-sizing:border-box}
 .pop{border:0;padding:0;position:relative}
 .pop>summary{list-style:none;font:500 13px var(--f-body);padding:6px 12px;border:1px solid var(--rule);border-radius:4px;background:var(--panel)}
 .pop>summary::-webkit-details-marker{display:none}
@@ -265,14 +276,21 @@ header h1{font-size:1.35rem}
 
 <div id="view-map" role="tabpanel" aria-labelledby="tab-map" style="display:grid;gap:16px;grid-template-columns:minmax(0,1fr)">
   <div class="bar">
-    <input type="text" id="q" list="termlist" placeholder="Term, for example rdfs:Class" autocomplete="off" aria-label="Term">
+    <input type="search" id="q" list="termlist" placeholder="Term, for example rdfs:Class" autocomplete="off" aria-label="Term">
     <datalist id="termlist"></datalist>
     <div class="seg" role="group" aria-label="Reach">
       <button id="reach-all" aria-pressed="true" type="button">Everything</button>
       <button id="reach-direct" aria-pressed="false" type="button">Direct only</button>
     </div>
-    <button class="btn" id="p-root" type="button">Root unit</button>
-    <button class="btn" id="p-clear" type="button">Clear</button>
+    <div class="seg" role="group" aria-label="Layout">
+      <button id="layout-tiers" aria-pressed="true" type="button">Tiers</button>
+      <button id="layout-onion" aria-pressed="false" type="button">Onion</button>
+      <button id="layout-treemap" aria-pressed="false" type="button">Treemap</button>
+      <button id="layout-pack" aria-pressed="false" type="button">Pack</button>
+      <button id="layout-tree" aria-pressed="false" type="button">Tree</button>
+      <button id="layout-cluster" aria-pressed="false" type="button">Cluster</button>
+    </div>
+    <select id="types" aria-label="Type" hidden></select>
     <details class="pop" id="files-pop"><summary id="files-sum">Files</summary>
       <div class="pop-body">
         <div class="files" id="files"></div>
@@ -290,7 +308,7 @@ header h1{font-size:1.35rem}
     </details>
     <details class="pop" id="view-pop"><summary>View</summary>
       <div class="pop-body">
-        <div class="checks"><label><input type="checkbox" id="view-ont">Ontologies</label></div>
+        <div class="checks"><label><input type="checkbox" id="view-ont">Prefixes</label></div>
         <p class="src" id="view-ont-list" style="margin:0"></p>
       </div>
     </details>
@@ -315,6 +333,10 @@ header h1{font-size:1.35rem}
         </defs>
         <g id="paths"></g>
       </svg>
+      <div id="onion-wrap" hidden>
+        <div id="onion"></div>
+        <div id="legend" aria-label="Prefixes"></div>
+      </div>
     </div>
     <div class="right">
       <aside class="side" id="side" aria-live="polite"></aside>
@@ -445,12 +467,15 @@ owl:Class a rdfs:Class ;                            <span class="src"># owl.ttl 
 </div>
 
 <script src="/vendor/n3.min.js"></script>
+<script src="/vendor/d3.min.js"></script>
 <script src="/depmap-core.js"></script>
 <script src="/local.js"></script>
 <script>
 const CHUNK=80000;
 let CHOOSE={};try{CHOOSE=JSON.parse(localStorage.getItem('depmap-prefix')||'{}')||{}}catch(e){}
-const S={showOnt:false,choose:CHOOSE,reach:'all',kinds:new Set(),kset:new Set(),hidden:new Set(),sel:new Set(),auto:true};
+const LAYOUTS=['tiers','onion','treemap','pack','tree','cluster'];
+let LAYOUT='tiers';try{const l=localStorage.getItem('depmap-layout');if(LAYOUTS.includes(l)) LAYOUT=l}catch(e){}
+const S={layout:LAYOUT,showOnt:false,choose:CHOOSE,reach:'all',kinds:new Set(),kset:new Set(),hidden:new Set(),sel:new Set(),auto:true};
 let FILES=[];          /* {id,name,format,enabled,key,count,triples,prefixes,error} */
 let D={terms:{},edges:[],tiers:[],cycles:[],triples:{}};
 let G={tier:{},unit:{},edges:[],out:{},inn:{},allOut:{},allIn:{}};
@@ -460,8 +485,13 @@ function el(t,c,txt){const e=document.createElement(t);if(c)e.className=c;if(txt
 /* the group of an edge: the top of the rdfs:subPropertyOf line of its property, from the loaded files */
 const kindOf=p=>D.kinds[p];
 function vocabOf(id){const t=D.terms[id];return t?t.p:''}
-const palette={};
-function colorOf(v){if(!(v in palette)) palette[v]=Object.keys(palette).length%6;return 'var(--c'+palette[v]+')'}
+/* one colour for each prefix in the loaded files, none used twice: a D3 ordinal scale over D3's rainbow */
+let PALETTE=null;
+function buildPalette(){
+  const ps=[...new Set(Object.keys(D.terms).map(id=>D.terms[id].p))].sort();
+  PALETTE=d3.scaleOrdinal(ps,d3.quantize(d3.interpolateRainbow,ps.length+1));
+}
+function colorOf(v){return PALETTE?PALETTE(v):'currentColor'}
 function say(t){$('status').textContent=t}
 function hash(s){let h=5381;for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)}
 
@@ -472,10 +502,10 @@ function recompute(){
   D=DepMap.analyze(use.map(f=>({name:f.name,triples:f.triples,prefixes:f.prefixes})),{bindings:FILES.filter(f=>f.prefixes).map(f=>({name:f.name,prefixes:f.prefixes})),choose:S.choose});
   /* a prefix selection changes the names: keep the selection by IRI */
   {const byIri=new Map(Object.keys(D.terms).map(id=>[D.terms[id].i,id]));S.sel=new Set(keep.map(i=>byIri.get(i)).filter(Boolean));if(focus) sheet.id=byIri.get(focus)||null}
-  indexFacts(use);ONT=ontologies();$('view-ont-list').textContent=ONT.size?[...ONT].sort().join(', '):'No ontologies in the loaded files.';
+  buildPalette();indexFacts(use);ONT=ontologies();IND=individuals();$('view-ont-list').textContent=ONT.size?[...ONT].sort().map(id=>id.replace(/:$/,'')).join(', '):'No prefixes in the loaded files.';
   S.sel=new Set([...S.sel].filter(id=>id in D.terms));
   if(S.auto&&D.tiers.length){S.sel=new Set([(rootUnit()||D.tiers[0].groups[0])[0]]);if(sheet.id&&!S.sel.has(sheet.id)){sheet.id=null;sheet.back=[]}}
-  renderFiles();renderKinds();renderPrefixes();build();renderTiers();renderVocabs();paint();
+  renderFiles();renderKinds();renderPrefixes();build();renderTiers();renderOnion();renderVocabs();paint();
   if(sheet.id&&!(sheet.id in D.terms)) focusTerm(S.sel.size?[...S.sel][0]:null);else if(!sheet.id&&S.sel.size) focusTerm([...S.sel][0]);else renderSheet();
   $('q').value=S.sel.size===1?[...S.sel][0]:'';
 }
@@ -521,7 +551,6 @@ function renderTiers(){
     row.appendChild(u);box.appendChild(row);
   }
   const dl=$('termlist');dl.textContent='';Object.keys(G.tier).sort().forEach(k=>{const o=el('option');o.value=k;dl.appendChild(o)});
-  $('p-root').disabled=!rootUnit();
 }
 function rootUnit(){return D.tiers.length?D.tiers[0].groups.find(g=>g.length>1):null}
 let UP=new Set(),DOWN=new Set();
@@ -536,6 +565,8 @@ function paint(){
     c.classList.add(S.sel.has(id)?'sel':UP.has(id)&&DOWN.has(id)?'cyc':UP.has(id)?'up':DOWN.has(id)?'down':'dim');
   }
   for(const u of document.querySelectorAll('#tiers .unit')) u.hidden=[...u.children].every(c=>c.hidden);
+  document.querySelector('.main').classList.toggle('solo',S.layout!=='tiers'&&!S.sel.size);
+  if(S.layout!=='tiers') paintOnion();
   draw();side();if(sheet.state==='open') renderSheet();
   const shown=G.edges.filter(e=>S.kinds.has(kindOf(e[1]))).length;
   if(D.tiers.length) say(Object.keys(G.tier).length+' terms in '+D.tiers.length+' tiers, '+D.cycles.length+' cycles, '+shown+' of '+G.edges.length+' edges in use. Arrows point from a term to what it depends on. Shift-click adds a term to the selection.'+Store.note);
@@ -546,21 +577,14 @@ function draw(){
   const map=$('map'),svg=$('edges'),g=$('paths');g.textContent='';
   const box=map.getBoundingClientRect();
   svg.setAttribute('width',map.clientWidth);svg.setAttribute('height',map.clientHeight);
+  if(S.layout!=='tiers') return;
   if(!S.sel.size||$('view-map').hidden) return;
   const cache={};
   const pos=id=>{if(id in cache)return cache[id];const c=chips[id];if(!c||c.hidden)return cache[id]=null;const r=c.getBoundingClientRect();
     return cache[id]={x:r.left-box.left+r.width/2,t:r.top-box.top,b:r.bottom-box.top}};
-  const upS=new Set([...UP,...S.sel]),downS=new Set([...DOWN,...S.sel]);
-  const frag=document.createDocumentFragment();let far=0;
-  for(const [s,p,o] of G.edges){
-    const k=kindOf(p);if(!S.kinds.has(k))continue;
-    const near=S.sel.has(s)||S.sel.has(o);
-    let dir=null;
-    if(S.reach==='direct'){if(S.sel.has(s))dir='up';else if(S.sel.has(o))dir='down'}
-    else if(upS.has(s)&&upS.has(o))dir='up';else if(downS.has(s)&&downS.has(o))dir='down';
-    if(!dir)continue;
-    if(!near&&++far>1500) continue;
-    const a=pos(s),b=pos(o);if(!a||!b)continue;
+  const frag=document.createDocumentFragment();
+  eachEdge((s,o,k,dir,near)=>{
+    const a=pos(s),b=pos(o);if(!a||!b)return;
     let d;
     if(s===o) d=`M${a.x-8},${a.t}C${a.x-26},${a.t-22} ${a.x+26},${a.t-22} ${a.x+8},${a.t}`;
     else if(b.b<=a.t){const dy=Math.max(14,(a.t-b.b)*.5);d=`M${a.x},${a.t}C${a.x},${a.t-dy} ${b.x},${b.b+dy} ${b.x},${b.b}`}
@@ -570,8 +594,448 @@ function draw(){
     path.setAttribute('class','e '+dir+(near?' near':' far'));if(LINE[k]){if(LINE[k][0]) path.style.strokeDasharray=LINE[k][0];if(LINE[k][1]) path.style.strokeWidth=LINE[k][1]}
     if(near)path.setAttribute('marker-end','url(#m-'+dir+')');
     (near?frag:g).appendChild(path);
-  }
+  });
   g.appendChild(frag);
+}
+/* the edges that the selection shows, each with its group, its direction and whether it touches the selection */
+function eachEdge(fn){
+  const upS=new Set([...UP,...S.sel]),downS=new Set([...DOWN,...S.sel]);let far=0;
+  for(const [s,p,o] of G.edges){
+    const k=kindOf(p);if(!S.kinds.has(k))continue;
+    const near=S.sel.has(s)||S.sel.has(o);
+    let dir=null;
+    if(S.reach==='direct'){if(S.sel.has(s))dir='up';else if(S.sel.has(o))dir='down'}
+    else if(upS.has(s)&&upS.has(o))dir='up';else if(downS.has(s)&&downS.has(o))dir='down';
+    if(!dir)continue;
+    if(!near&&++far>1500) continue;
+    fn(s,o,k,dir,near);
+  }
+}
+
+/* ---------- onion: D3's zoomable sunburst example (observablehq.com/@d3/zoomable-sunburst), with our terms as its data ----------
+   The page only makes the data. D3's example does the drawing, the names and the zoom. */
+/* rdf:type and rdfs:subClassOf are different relations, so a chart groups by one relation at a time, and the box
+   switches between them. What the map does not show (an individual, an ontology, a vocabulary that is switched off)
+   is not in the chart. */
+function onionShows(id){return !(IND.has(id)||S.hidden.has(vocabOf(id))||(!S.showOnt&&ONT.has(id)))}
+/* the distinct types (rdf:type) that the shown terms state */
+function onionTypes(){
+  const n=new Map();
+  for(const id in D.terms) if(onionShows(id)) for(const t of pointsAt(D.terms[id].i,TYPE)) n.set(t,(n.get(t)||0)+1);
+  return [...n].sort((a,b)=>b[1]-a[1]||(a[0]<b[0]?-1:1));
+}
+function renderTypes(types){
+  const box=$('types');box.textContent='';
+  for(const [t] of types){const o=el('option',null,IRI2ID.get(t)||short(t));o.value=t;o.selected=t===S.type;box.appendChild(o)}
+}
+/* The data: a tree of {name, children}, with a value of 1 on each term that has nothing under it.
+   The box picks one type. The chart shows the terms of that type by their class relationships:
+   a term is under the term it is a subclass or a subproperty of. */
+function onionData(){
+  const types=onionTypes();
+  if(!types.some(t=>t[0]===S.type)) S.type=types.length?types[0][0]:null;
+  renderTypes(types);
+  /* the name in a chart is the term without its prefix: the colour says the prefix, and the legend names the colours */
+  const bare=id=>{const i=id.indexOf(':');return id.charAt(0)!=='<'&&i>=0&&i<id.length-1?id.slice(i+1):id};
+  const node={},top={name:S.type?bare(IRI2ID.get(S.type)||short(S.type)):'terms',children:[]};
+  for(const id in D.terms) if(onionShows(id)&&pointsAt(D.terms[id].i,TYPE).includes(S.type)) node[id]={name:bare(id),id,children:[]};
+  /* a term with several terms above it takes one: of its own vocabulary first, then by name */
+  const above={};
+  for(const id of Object.keys(node).sort()){
+    const iri=D.terms[id].i,own=o=>vocabOf(o)===vocabOf(id)?0:1;
+    const ups=[...pointsAt(iri,SUBC),...pointsAt(iri,SUBP)].map(x=>IRI2ID.get(x)).filter(o=>o&&o!==id&&node[o]).sort((a,b)=>own(a)-own(b)||(a<b?-1:1));
+    for(const o of ups){let a=o,loop=false;while(a){if(a===id){loop=true;break}a=above[a]}if(!loop){above[id]=o;break}}
+  }
+  for(const id in node) (above[id]?node[above[id]]:top).children.push(node[id]);
+  for(const id in node){const n=node[id];if(!n.children.length){delete n.children;n.value=1}}
+  if(!top.children.length){delete top.children;top.value=1}
+  return top;
+}
+/* D3's example, as published. Three things differ, all of them ours: the colour of a cell is the colour of its
+   vocabulary on this page, the names take the colour of the page's text, and a click also selects the term. */
+function sunburst(data){
+  // Specify the chart’s dimensions.
+  const width = 928;
+  const height = width;
+  const radius = width / 6;
+
+  // Compute the layout.
+  const hierarchy = d3.hierarchy(data)
+      .sum(d => d.value)
+      .sort((a, b) => b.value - a.value);
+  const root = d3.partition()
+      .size([2 * Math.PI, hierarchy.height + 1])
+    (hierarchy);
+  root.each(d => d.current = d);
+
+  // Create the arc generator.
+  const arc = d3.arc()
+      .startAngle(d => d.x0)
+      .endAngle(d => d.x1)
+      .padAngle(d => Math.min((d.x1 - d.x0) / 2, 0.005))
+      .padRadius(radius * 1.5)
+      .innerRadius(d => d.y0 * radius)
+      .outerRadius(d => Math.max(d.y0 * radius, d.y1 * radius - 1))
+
+  // Create the SVG container.
+  const svg = d3.create("svg")
+      .attr("viewBox", [-width / 2, -height / 2, width, width])
+      .style("font", "10px sans-serif");
+
+  // Append the arcs.
+  const path = svg.append("g")
+    .selectAll("path")
+    .data(root.descendants().slice(1))
+    .join("path")
+      .style("fill", d => colorOf(vocabOf(d.data.id)))
+      .attr("fill-opacity", d => arcVisible(d.current) ? (d.children ? 0.6 : 0.4) : 0)
+      .attr("pointer-events", d => arcVisible(d.current) ? "auto" : "none")
+      .attr("d", d => arc(d.current));
+
+  // Make them clickable if they have children.
+  path.filter(d => d.children)
+      .style("cursor", "pointer")
+      .on("click", clicked);
+  path.filter(d => !d.children)
+      .style("cursor", "pointer")
+      .on("click", (event, d) => pick(d.data.id, false, false));
+
+  const format = d3.format(",d");
+  path.append("title")
+      .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\n${format(d.value)}`);
+
+  const label = svg.append("g")
+      .attr("pointer-events", "none")
+      .attr("text-anchor", "middle")
+      .attr("fill", "currentColor")
+      .style("user-select", "none")
+    .selectAll("text")
+    .data(root.descendants().slice(1))
+    .join("text")
+      .attr("dy", "0.35em")
+      .attr("fill-opacity", d => +labelVisible(d.current))
+      .attr("transform", d => labelTransform(d.current))
+      .text(d => d.data.name);
+
+  const parent = svg.append("circle")
+      .datum(root)
+      .attr("r", radius)
+      .attr("fill", "none")
+      .attr("pointer-events", "all")
+      .on("click", clicked);
+
+  // Handle zoom on click.
+  function clicked(event, p) {
+    if (p.data.id in G.tier) pick(p.data.id, false, false);
+    parent.datum(p.parent || root);
+
+    root.each(d => d.target = {
+      x0: Math.max(0, Math.min(1, (d.x0 - p.x0) / (p.x1 - p.x0))) * 2 * Math.PI,
+      x1: Math.max(0, Math.min(1, (d.x1 - p.x0) / (p.x1 - p.x0))) * 2 * Math.PI,
+      y0: Math.max(0, d.y0 - p.depth),
+      y1: Math.max(0, d.y1 - p.depth)
+    });
+
+    const t = svg.transition().duration(event.altKey ? 7500 : 750);
+
+    // Transition the data on all arcs, even the ones that aren’t visible,
+    // so that if this transition is interrupted, entering arcs will start
+    // the next transition from the desired position.
+    path.transition(t)
+        .tween("data", d => {
+          const i = d3.interpolate(d.current, d.target);
+          return t => d.current = i(t);
+        })
+      .filter(function(d) {
+        return +this.getAttribute("fill-opacity") || arcVisible(d.target);
+      })
+        .attr("fill-opacity", d => arcVisible(d.target) ? (d.children ? 0.6 : 0.4) : 0)
+        .attr("pointer-events", d => arcVisible(d.target) ? "auto" : "none")
+
+        .attrTween("d", d => () => arc(d.current));
+
+    label.filter(function(d) {
+        return +this.getAttribute("fill-opacity") || labelVisible(d.target);
+      }).transition(t)
+        .attr("fill-opacity", d => +labelVisible(d.target))
+        .attrTween("transform", d => () => labelTransform(d.current));
+  }
+
+  function arcVisible(d) {
+    return d.y1 <= 3 && d.y0 >= 1 && d.x1 > d.x0;
+  }
+
+  function labelVisible(d) {
+    return d.y1 <= 3 && d.y0 >= 1 && (d.y1 - d.y0) * (d.x1 - d.x0) > 0.03;
+  }
+
+  function labelTransform(d) {
+    const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
+    const y = (d.y0 + d.y1) / 2 * radius;
+    return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
+  }
+
+  return svg.node();
+}
+/* D3's treemap example (observablehq.com/@d3/treemap/2), as published. Ours: the colour of a cell, the colour of the
+   names, plain ids in place of the notebook's DOM.uid, and a click selects the term. */
+function treemap(data){
+  // Specify the chart’s dimensions.
+  const width = 1154;
+  const height = 1154;
+
+  // Compute the layout.
+  const root = d3.treemap()
+    .tile(d3.treemapSquarify)
+    .size([width, height])
+    .padding(1)
+    .round(true)
+  (d3.hierarchy(data)
+      .sum(d => d.value)
+      .sort((a, b) => b.value - a.value));
+
+  // Create the SVG container.
+  const svg = d3.create("svg")
+      .attr("viewBox", [0, 0, width, height])
+      .attr("width", width)
+      .attr("height", height)
+      .attr("fill", "currentColor")
+      .attr("style", "max-width: 100%; height: auto; font: 10px sans-serif;");
+
+  // Add a cell for each leaf of the hierarchy.
+  const leaf = svg.selectAll("g")
+    .data(root.leaves())
+    .join("g")
+      .attr("transform", d => `translate(${d.x0},${d.y0})`)
+      .style("cursor", "pointer")
+      .on("click", (event, d) => pick(d.data.id, false, false));
+
+  // Append a tooltip.
+  const format = d3.format(",d");
+  leaf.append("title")
+      .text(d => `${d.ancestors().reverse().map(d => d.data.name).join(".")}\n${format(d.value)}`);
+
+  // Append a color rectangle.
+  leaf.append("rect")
+      .attr("id", (d, i) => "tm-leaf-" + i)
+      .style("fill", d => colorOf(vocabOf(d.data.id)))
+      .attr("fill-opacity", 0.6)
+      .attr("width", d => d.x1 - d.x0)
+      .attr("height", d => d.y1 - d.y0);
+
+  // Append a clipPath to ensure text does not overflow.
+  leaf.append("clipPath")
+      .attr("id", (d, i) => "tm-clip-" + i)
+    .append("use")
+      .attr("href", (d, i) => "#tm-leaf-" + i);
+
+  // Append multiline text. The last line shows the value and has a specific formatting.
+  leaf.append("text")
+      .attr("clip-path", (d, i) => "url(#tm-clip-" + i + ")")
+    .selectAll("tspan")
+    .data(d => d.data.name.split(/(?=[A-Z][a-z])|\s+/g).concat(format(d.value)))
+    .join("tspan")
+      .attr("x", 3)
+      .attr("y", (d, i, nodes) => `${(i === nodes.length - 1) * 0.3 + 1.1 + i * 0.9}em`)
+      .attr("fill-opacity", (d, i, nodes) => i === nodes.length - 1 ? 0.7 : null)
+      .text(d => d);
+
+  return svg.node();
+}
+/* D3's circle packing example (observablehq.com/@d3/pack/2), as published. Ours: the colours and the click. */
+function pack(data){
+  // Specify the dimensions of the chart.
+  const width = 928;
+  const height = width;
+  const margin = 1; // to avoid clipping the root circle stroke
+
+  // Specify the number format for values.
+  const format = d3.format(",d");
+
+  // Create the pack layout.
+  const pack = d3.pack()
+      .size([width - margin * 2, height - margin * 2])
+      .padding(3);
+
+  // Compute the hierarchy from the JSON data; recursively sum the
+  // values for each node; sort the tree by descending value; lastly
+  // apply the pack layout.
+  const root = pack(d3.hierarchy(data)
+      .sum(d => d.value)
+      .sort((a, b) => b.value - a.value));
+
+  // Create the SVG container.
+  const svg = d3.create("svg")
+      .attr("width", width)
+      .attr("height", height)
+      .attr("viewBox", [-margin, -margin, width, height])
+      .attr("fill", "currentColor")
+      .attr("style", "width: 100%; height: auto; font: 10px sans-serif;")
+      .attr("text-anchor", "middle");
+
+  // Place each node according to the layout’s x and y values.
+  const node = svg.append("g")
+    .selectAll()
+    .data(root.descendants())
+    .join("g")
+      .attr("transform", d => `translate(${d.x},${d.y})`)
+      .style("cursor", "pointer")
+      .on("click", (event, d) => { if (d.data.id in G.tier) { event.stopPropagation(); pick(d.data.id, false, false); } });
+
+  // Add a title.
+  node.append("title")
+      .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\n${format(d.value)}`);
+
+  // Add a filled or stroked circle.
+  node.append("circle")
+      .style("fill", d => d.data.id in G.tier ? colorOf(vocabOf(d.data.id)) : "none")
+      .attr("fill-opacity", d => d.children ? 0.15 : 0.6)
+      .style("stroke", d => d.children ? "var(--rule)" : null)
+      .attr("r", d => d.r);
+
+  // Add a label to leaf nodes.
+  const text = node
+    .filter(d => !d.children && d.r > 10)
+    .append("text")
+      .attr("clip-path", d => `circle(${d.r})`);
+
+  // Add a tspan for each CamelCase-separated word.
+  text.selectAll()
+    .data(d => d.data.name.split(/(?=[A-Z][a-z])|\s+/g))
+    .join("tspan")
+      .attr("x", 0)
+      .attr("y", (d, i, nodes) => `${i - nodes.length / 2 + 0.35}em`)
+      .text(d => d);
+
+  // Add a tspan for the node’s value.
+  text.append("tspan")
+      .attr("x", 0)
+      .attr("y", d => `${d.data.name.split(/(?=[A-Z][a-z])|\s+/g).length / 2 + 0.35}em`)
+      .attr("fill-opacity", 0.7)
+      .text(d => format(d.value));
+
+  return svg.node();
+}
+/* D3's tidy tree example (observablehq.com/@d3/tree/2) and its dendrogram example (observablehq.com/@d3/cluster/2),
+   as published: the two differ only in the layout, d3.tree() or d3.cluster(). Ours: the colours and the click. */
+function treeChart(data, layout){
+  const width = 928;
+
+  // Compute the tree height; this approach will allow the height of the
+  // SVG to scale according to the breadth (width) of the tree layout.
+  const root = d3.hierarchy(data);
+  const dx = 10;
+  const dy = width / (root.height + 1);
+
+  // Create a tree layout.
+  const tree = layout.nodeSize([dx, dy]);
+
+  // Sort the tree and apply the layout.
+  root.sort((a, b) => d3.ascending(a.data.name, b.data.name));
+  tree(root);
+
+  // Compute the extent of the tree. Note that x and y are swapped here
+  // because in the tree layout, x is the breadth, but when displayed, the
+  // tree extends right rather than down.
+  let x0 = Infinity;
+  let x1 = -x0;
+  root.each(d => {
+    if (d.x > x1) x1 = d.x;
+    if (d.x < x0) x0 = d.x;
+  });
+
+  // Compute the adjusted height of the tree.
+  const height = x1 - x0 + dx * 2;
+
+  const svg = d3.create("svg")
+      .attr("width", width)
+      .attr("height", height)
+      .attr("viewBox", [-dy / 3, x0 - dx, width, height])
+      .attr("fill", "currentColor")
+      .attr("style", "max-width: 100%; height: auto; font: 10px sans-serif;");
+
+  const link = svg.append("g")
+      .attr("fill", "none")
+      .attr("stroke", "currentColor")
+      .attr("stroke-opacity", 0.4)
+      .attr("stroke-width", 1.5)
+    .selectAll()
+      .data(root.links())
+      .join("path")
+        .attr("d", d3.linkHorizontal()
+            .x(d => d.y)
+            .y(d => d.x));
+
+  const node = svg.append("g")
+      .attr("stroke-linejoin", "round")
+      .attr("stroke-width", 3)
+    .selectAll()
+    .data(root.descendants())
+    .join("g")
+      .attr("transform", d => `translate(${d.y},${d.x})`)
+      .style("cursor", "pointer")
+      .on("click", (event, d) => { if (d.data.id in G.tier) pick(d.data.id, false, false); });
+
+  node.append("circle")
+      .style("fill", d => d.data.id in G.tier ? colorOf(vocabOf(d.data.id)) : "currentColor")
+      .attr("r", 2.5);
+
+  node.append("text")
+      .attr("dy", "0.31em")
+      .attr("x", d => d.children ? -6 : 6)
+      .attr("text-anchor", d => d.children ? "end" : "start")
+      .text(d => d.data.name)
+      .style("stroke", "var(--panel)")
+      .attr("paint-order", "stroke");
+
+  return svg.node();
+}
+/* each view is one D3 layout, and all of them take the same data */
+const CHARTS={onion:sunburst,treemap,pack,tree:d=>treeChart(d,d3.tree()),cluster:d=>treeChart(d,d3.cluster())};
+let ONION_KEY=null;
+function renderOnion(){
+  ONION_KEY=onionKey();
+  const chart=CHARTS[S.layout],box=$('onion');
+  box.dataset.view=S.layout;
+  box.replaceChildren();
+  if(!chart||!D.tiers.length) return;
+  const data=onionData();ONION_KEY=onionKey();
+  /* the legend: each prefix in this chart, with its colour */
+  const seen=new Set();(function walk(n){if(n.id) seen.add(vocabOf(n.id));for(const c of n.children||[]) walk(c)})(data);
+  const legend=$('legend');legend.textContent='';
+  for(const p of [...seen].sort()){const row=el('div');const sw=el('span','sw');sw.style.background=colorOf(p);row.append(sw,p);legend.appendChild(row)}
+  const svg=chart(data);box.appendChild(svg);
+  /* the chart takes the whole panel (the size is in the style sheet), and the view starts on all of what D3 drew, so no name
+     is cut off. The sunburst keeps its own view: it holds rings that it shows only after a click. */
+  svg.removeAttribute('width');svg.removeAttribute('height');svg.style.width='';svg.style.height='';svg.style.maxWidth='';
+  if(S.layout!=='onion'){const b=svg.getBBox(),p=12;if(b.width>0&&b.height>0) svg.setAttribute('viewBox',[b.x-p,b.y-p,b.width+2*p,b.height+2*p])}
+  viewZoom(svg);
+}
+/* Zoom of the view itself, the d3-zoom way: what D3 drew goes into one group, and the zoom sets the transform of that
+   group. The wheel zooms at the pointer and a drag moves the view. It has nothing to do with selection. */
+function viewZoom(svg){
+  const g=document.createElementNS(NS,'g');
+  g.append(...svg.childNodes);svg.appendChild(g);
+  d3.select(svg).call(d3.zoom().scaleExtent([1,200]).clickDistance(6).on('zoom',ev=>g.setAttribute('transform',ev.transform))).on('dblclick.zoom',null);
+  return svg;
+}
+/* the data changes when what the map shows changes; then D3 draws it again */
+function onionKey(){return S.layout+'|'+S.type+'|'+S.showOnt+'|'+[...S.hidden].sort().join(' ')}
+function paintOnion(){if(ONION_KEY!==onionKey()) renderOnion()}
+function showLayout(){
+  const on=S.layout!=='tiers';
+  $('tiers').hidden=on;$('edges').style.display=on?'none':'';$('onion-wrap').hidden=!on;$('types').hidden=!on;
+  for(const l of LAYOUTS) $('layout-'+l).setAttribute('aria-pressed',l===S.layout);
+}
+function setLayout(l){
+  S.layout=l;showLayout();
+  try{localStorage.setItem('depmap-layout',l)}catch(e){}
+  paint();
+}
+{
+  showLayout();
+  for(const l of LAYOUTS) $('layout-'+l).addEventListener('click',()=>setLayout(l));
+  $('types').addEventListener('change',e=>{S.type=e.target.value;paint()});
 }
 
 /* ---------- side panel ---------- */
@@ -668,6 +1132,20 @@ function ontologies(){
   const out=new Set(),types=new Set();
   for(const [iri,arr] of FX.obj) if(IRI2ID.has(iri)&&arr.some(t=>t.p===RDFSN+'isDefinedBy')){out.add(IRI2ID.get(iri));for(const c of pointsAt(iri,TYPE)) types.add(c)}
   for(const id in D.terms) if(pointsAt(D.terms[id].i,TYPE).some(c=>types.has(c))) out.add(id);
+  return out}
+/* An individual is an instance of something (rdf:type) that is not itself a class, a property or a datatype.
+   It is data, not a concept, and the onion does not show it. */
+let IND=new Set();
+function individuals(){
+  const out=new Set(),CLS=RDFSN+'Class',PROP=RDFN+'Property',OWL='http://www.w3.org/2002/07/owl#';
+  const meta=c=>c===CLS||c===PROP||c===DATATYPE||supers(c,SUBC).some(s=>s===CLS||s===PROP)||(c.startsWith(OWL)&&/(Class|Property|Restriction|DataRange)$/.test(c));
+  for(const id in D.terms){
+    if(ONT.has(id)) continue;
+    const iri=D.terms[id].i,types=pointsAt(iri,TYPE);
+    if(!types.length||types.some(meta)) continue;
+    if((FX.subj.get(iri)||[]).some(t=>t.p===SUBC||t.p===SUBP||t.p===DOMAIN||t.p===RANGE)) continue;
+    if(incoming(iri).some(x=>x[0]===TYPE||x[0]===SUBC||x[0]===SUBP||x[0]===DOMAIN||x[0]===RANGE)) continue;
+    out.add(id)}
   return out}
 $('view-ont').addEventListener('change',e=>{S.showOnt=e.target.checked;paint()});
 /* obey the Show filter of the map: a term of an unselected vocabulary is left out */
@@ -1028,8 +1506,8 @@ function renderKinds(){
 }
 $('q').addEventListener('change',e=>{const v=e.target.value.trim();if(v)pick(v,false,true)});
 $('reach-all').addEventListener('click',()=>setReach('all'));$('reach-direct').addEventListener('click',()=>setReach('direct'));
-$('p-root').addEventListener('click',()=>{const r=rootUnit();if(r){S.auto=false;S.sel=new Set(r);$('q').value='';paint();focusTerm(r[0])}});
-$('p-clear').addEventListener('click',()=>{S.auto=false;S.sel=new Set();$('q').value='';paint();focusTerm(null)});
+/* the box is the selection: clearing the box (its own clear button, or Escape) clears the selection */
+$('q').addEventListener('input',e=>{if(e.target.value===''&&S.sel.size){S.auto=false;S.sel=new Set();paint();focusTerm(null)}});
 for(const t of ['map','api','notes']) $('tab-'+t).addEventListener('click',()=>showTab(t));
 $('add-btn').addEventListener('click',()=>$('file-input').click());
 $('file-input').addEventListener('change',e=>{addFiles([...e.target.files]);e.target.value=''});
