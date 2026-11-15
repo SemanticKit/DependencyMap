@@ -205,6 +205,8 @@ export class Shape {
     }
 
     return {
+      /* the values as they were given, so the answer can be read against what was asked */
+      request: values,
       inputs,
       unmatched: inputs.filter(input => !input.matches.length).map(input => input.value),
       classes: inShape.map(iri => this.map.short(iri)).sort(),

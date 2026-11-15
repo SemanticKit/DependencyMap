@@ -75,7 +75,9 @@ async function check(client, label) {
 
   /* shape takes values in any form: a text, an object with names and values, a number. It gives the terms each
      value matches, the classes those involve, and what links the classes. */
-  const shape = await call('shape', { values: ['sub class of', { datatype: 'the class of datatypes' }, 42, 'zzqqxxjj'] });
+  const values = ['sub class of', { datatype: 'the class of datatypes' }, 42, 'zzqqxxjj'];
+  const shape = await call('shape', { values });
+  assert.deepStrictEqual(shape.request, values, 'shape gives the request back');
   assert.deepStrictEqual(shape.inputs.map(input => input.value), ['sub class of', 'datatype', 'the class of datatypes', '42', 'zzqqxxjj'], 'shape reads every value');
   const subClassOf = shape.inputs[0].matches.find(match => match.term === 'rdfs:subClassOf');
   assert(subClassOf && subClassOf.kind === 'property' && subClassOf.classes.includes('rdfs:Class'), 'a property is the classes it connects');
