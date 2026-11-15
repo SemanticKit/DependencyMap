@@ -42,7 +42,7 @@ async function check(client, label) {
 
   /* the tools and the prompts */
   const tools = (await client.listTools()).tools.map(tool => tool.name).sort();
-  assert.deepStrictEqual(tools, ['create', 'environment', 'find', 'order', 'select', 'summary', 'term', 'terms_in']);
+  assert.deepStrictEqual(tools, ['create', 'environment', 'find', 'order', 'select', 'shape', 'summary', 'term', 'terms_in']);
   const prompts = (await client.listPrompts()).prompts.map(prompt => prompt.name).sort();
   assert.deepStrictEqual(prompts, ['build_order', 'what_first']);
   const asked = await client.getPrompt({ name: 'what_first', arguments: { id: 'rdfs:Class' } });
@@ -72,6 +72,17 @@ async function check(client, label) {
   assert((await call('find', { text: 'subclassof' })).includes('rdfs:subClassOf'));
   assert((await call('terms_in', { name: 'rdfs.ttl' })).includes('rdfs:Class'));
   assert.deepStrictEqual((await call('select', { ids: ['rdfs:Class'] })).selected, ['rdfs:Class']);
+
+  /* shape takes values in any form: a text, an object with names and values, a number. It gives the terms each
+     value matches, the classes those involve, and what links the classes. */
+  const shape = await call('shape', { values: ['sub class of', { datatype: 'the class of datatypes' }, 42, 'zzqqxxjj'] });
+  assert.deepStrictEqual(shape.inputs.map(input => input.value), ['sub class of', 'datatype', 'the class of datatypes', '42', 'zzqqxxjj'], 'shape reads every value');
+  const subClassOf = shape.inputs[0].matches.find(match => match.term === 'rdfs:subClassOf');
+  assert(subClassOf && subClassOf.kind === 'property' && subClassOf.classes.includes('rdfs:Class'), 'a property is the classes it connects');
+  assert(shape.inputs[1].matches.some(match => match.term === 'rdfs:Datatype' && match.kind === 'class'), 'a class is itself');
+  assert(shape.classes.includes('rdfs:Class') && shape.classes.includes('rdfs:Datatype'), 'shape gives the classes');
+  assert(shape.links.some(link => link.from === 'rdfs:Datatype' && link.property === 'rdfs:subClassOf' && link.to === 'rdfs:Class'), 'shape gives the links');
+  assert(shape.unmatched.includes('zzqqxxjj'), 'a value that matches nothing is said to match nothing');
 
   /* create makes a term of a type, and checks each value against the property it is for */
   const made = await call('create', { type: 'rdfs:Class', id: 'rdfs:Smoke', properties: { label: 'Smoke', subClassOf: ['rdfs:Resource'] } });
