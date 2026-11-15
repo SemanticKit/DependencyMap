@@ -1,15 +1,14 @@
-/* The details of one term, as the sheet shows them. The files define what is shown: the classes of the term choose
-   its views, and the properties attached to each class (rdfs:domain) are its fields. This class works out what
-   there is to show; the TermDetails component and the components under it put it on the page.
+/* What the views of a term read. The ontologies define what is shown: a type is a term of the map, and the
+   properties declared for it (rdfs:domain) are its format. A view asks whether the term is of a type (isA) and for
+   the term through the format of that type (formatOf).
 
    What it gives:
-     details  { iri, comment, fields, groups, tabs }
      field    { property, name, tip, text, values }      one property of the term, with the values the term states
-     value    { literal | iri, from, note }              from: the property under the field's that states the value
-     group    { definedBy, name, lists }                 the properties with the term in their domain, by rdfs:isDefinedBy
-     list     { from, rows }                             from: the class above the term that the properties come from
-     row      { iri, label, comment, note, blocks }      one such property, shown as a term
-     block    { heading, fields }                        the fields of one view; heading: the class of the view */
+     value    { literal | iri }
+     details  { iri, properties, tabs }                  the properties with the term as their domain;
+                                                         tabs: each { iri, name }, a value of rdfs:isDefinedBy
+     row      { iri, id, label, comment, definedBy }     one such property: its name and its comment */
+import { TermMap } from './TermMap.js';
 import { TYPE, CLASS, RESOURCE, LITERAL, DATATYPE, LABEL, COMMENT, SUBCLASS_OF, SUBPROPERTY_OF, DOMAIN, RANGE, IS_DEFINED_BY } from '../rdf.js';
 
 export class TermDetails {
@@ -20,28 +19,11 @@ export class TermDetails {
     this.isShown = isShown;
   }
 
-  /* the details of the term with this id */
+  /* the properties that have the term with this id as their domain */
   of(id) {
     const iri = this.map.iriOf(id);
-    const classes = this.classesOf(iri);
-    /* the name and the comment of the term are the heading of the sheet, not fields */
-    const blocks = this.blocksOf(iri, classes, new Set([LABEL, COMMENT]));
-    const inherited = this.inheritedDomainFields(iri, classes);
-    /* the definition is one list: the fields of each view the term has, in the order of the views */
-    const fields = [];
-    for (const cls of classes) {
-      const block = blocks.find(each => each.heading === cls);
-      if (block) fields.push(...block.fields);
-      fields.push(...inherited.filter(each => each.cls === cls).map(each => each.field));
-    }
-    const rows = this.propertyRows(iri);
-    return {
-      iri,
-      comment: this.statements.text(iri, COMMENT),
-      fields,
-      groups: this.groupsOf(iri, rows),
-      tabs: this.tabsOf(rows),
-    };
+    const properties = this.propertyRows(iri);
+    return { iri, properties, tabs: this.tabsOf(properties) };
   }
 
   /* ---------- the classes of a term ---------- */
@@ -89,67 +71,47 @@ export class TermDetails {
 
   /* ---------- the fields of a term ---------- */
 
-  /* The fields of a term, as one block for each of its classes. A statement of the term goes to the view of the
-     class that its property is attached to (rdfs:domain); a property of no class goes to rdfs:Resource. A property
-     with several domains is in the view of each. A block with no field is left out. */
-  blocksOf(iri, classes, leaveOut) {
-    const fields = this.fieldProperties(iri, leaveOut);
-    const blocks = [];
-    for (const cls of classes) {
-      const here = [...fields.keys()].filter(property => {
-        const domains = this.domainOf(property).filter(domain => classes.includes(domain));
-        return domains.length ? domains.includes(cls) : cls === RESOURCE;
-      });
-      const made = this.map.order(here)
-        .map(property => this.fieldOf(iri, property, fields.get(property)))
-        .filter(Boolean);
-      if (made.length) blocks.push({ heading: cls, fields: made });
-    }
-    return blocks;
+  /* whether a term is an instance of a class */
+  isA(id, cls) {
+    return this.classesOf(this.map.iriOf(id)).includes(cls);
   }
 
-  /* The properties that are fields of a term, each with the properties under it that the term also states. A value
-     of a property is a value of each property above it (RDF 1.2 Schema 2.2.5), so a property whose super-property
-     the map shows is not a field of its own: its values are in the field of that super-property, under its name. */
-  fieldProperties(iri, leaveOut) {
+  /* A term through the format of a type. The type is a term of the map, and the ontologies say which properties
+     are declared for it (rdfs:domain): the format is those properties, in the order of the map. This gives a field
+     for each of them that the term states. */
+  formatOf(id, type) {
+    const iri = this.map.iriOf(id);
+    const declared = this.statements.pointingAt(type)
+      .filter(each => each.property === DOMAIN && this.isShown(each.subject))
+      .map(each => each.subject);
+    return this.map.order([...new Set(declared)])
+      .map(property => this.fieldOf(iri, property))
+      .filter(Boolean);
+  }
+
+  /* A term with no type in mind: a field for each property the term states and the map shows, in the order of the
+     map. */
+  fieldsOf(id) {
+    const iri = this.map.iriOf(id);
     const stated = [...new Set(this.statements.about(iri).map(statement => statement.predicate.value))];
-    const fields = new Map();
-    for (const property of this.map.order(stated).filter(this.isShown)) {
-      const top = this.topShown(property);
-      if (leaveOut.has(property) || leaveOut.has(top)) continue;
-      if (!fields.has(top)) fields.set(top, []);
-      fields.get(top).push(property);
-    }
-    return fields;
+    return this.map.order(stated)
+      .filter(this.isShown)
+      .map(property => this.fieldOf(iri, property))
+      .filter(Boolean);
   }
 
-  /* the farthest property above this one that the map shows, or the property itself */
-  topShown(property) {
-    let top = property;
-    for (const above of this.statements.above(property, SUBPROPERTY_OF)) {
-      if (this.isShown(above)) top = above;
-    }
-    return top;
-  }
-
-  /* One field: the values the term states with the property, then those it states with each property under it.
-     A value from a property under it names that property. A field with no value is not shown. */
-  fieldOf(iri, property, stated) {
+  /* One field: the values the term states with the property. A field with no value is not shown. */
+  fieldOf(iri, property) {
     const values = this.valuesOf(iri, property);
-    let text = values.length > 0 && this.isText(property);
-    for (const under of this.map.order(stated.filter(each => each !== property))) {
-      const more = this.valuesOf(iri, under);
-      if (!more.length) continue;
-      if (this.isText(under)) text = true;
-      const from = { name: this.nameOf(under), tip: this.tipOf(under) };
-      values.push(...more.map(value => ({ ...value, from })));
-    }
     if (!values.length) return null;
-    return this.field(property, values, text);
+    return this.field(property, values, this.isText(property));
   }
 
+  /* A field is text when the range of its property is literal, or when one of its values is a string: a property
+     with no range can still state a string. */
   field(property, values, text) {
-    return { property, name: this.nameOf(property), tip: this.tipOf(property), text, values };
+    const states = values.some(value => value.literal && value.literal.string);
+    return { property, name: this.nameOf(property), tip: this.tipOf(property), text: text || states, values };
   }
 
   /* the values a term states with a property: each a literal, or an IRI that the map shows */
@@ -158,25 +120,33 @@ export class TermDetails {
        that a class is under it, says nothing */
     const saysNothing = value => value.termType === 'NamedNode' && value.value === RESOURCE && this.rangeOf(property).includes(CLASS);
     const values = [];
+    /* a value is shown once, however many ontologies state it */
+    const addLiteral = literal => {
+      if (!values.some(known => known.literal && known.literal.text === literal.text && known.literal.tag === literal.tag)) values.push({ literal });
+    };
+    const addIri = value => {
+      if (!values.some(known => known.iri === value)) values.push({ iri: value });
+    };
     for (const statement of this.statements.about(iri)) {
       if (statement.predicate.value !== property || saysNothing(statement.object)) continue;
       if (statement.object.termType === 'Literal') {
-        values.push({ literal: this.literal(statement.object) });
+        addLiteral(this.literal(statement.object));
         continue;
       }
       for (const value of this.statements.irisIn(statement.object, statement.graph)) {
-        if (this.isShown(value)) values.push({ iri: value });
+        if (this.isShown(value)) addIri(value);
       }
     }
     return values;
   }
 
-  /* a literal with what it says of itself: its language, or its datatype when that is not a plain string */
+  /* a literal with what it says of itself: its language, or its datatype when that is not a plain string; string
+     says that it is a string, with a language or without */
   literal(value) {
-    if (value.language) return { text: value.value, tag: '@' + value.language };
+    if (value.language) return { text: value.value, tag: '@' + value.language, string: true };
     const datatype = value.datatype ? value.datatype.value : '';
-    if (datatype && !/#string$/.test(datatype)) return { text: value.value, tag: this.statements.short(datatype) };
-    return { text: value.value, tag: '' };
+    if (datatype && !/#string$/.test(datatype)) return { text: value.value, tag: this.statements.short(datatype), string: false };
+    return { text: value.value, tag: '', string: true };
   }
 
   /* The range of a property says what its values are: a literal range gives text, each other range gives links. */
@@ -191,116 +161,43 @@ export class TermDetails {
     return this.statements.values(cls, TYPE).includes(DATATYPE);
   }
 
-  /* The domain a term has from each property above it (rdfs:subPropertyOf): each { cls, field }, a field of its own
-     that says where the domain is inherited from, in the view of the class that rdfs:domain is attached to. */
-  inheritedDomainFields(iri, classes) {
-    if (!this.isShown(DOMAIN)) return [];
-    const statements = this.statements;
-    const own = statements.values(iri, DOMAIN);
-    const views = this.domainOf(DOMAIN).filter(cls => classes.includes(cls));
-    const fields = [];
-    for (const above of statements.above(iri, SUBPROPERTY_OF)) {
-      for (const domain of statements.values(above, DOMAIN)) {
-        if (own.includes(domain) || !this.isShown(domain)) continue;
-        const value = { iri: domain, note: { text: ' inherited from ', iri: above } };
-        for (const cls of views) fields.push({ cls, field: this.field(DOMAIN, [value], false) });
-      }
-    }
-    return fields;
-  }
-
   /* ---------- the properties that have the term in their domain ---------- */
 
-  /* Each property whose rdfs:domain is the term or a class above it (rdfs:subClassOf), and each property under such
-     a property (rdfs:subPropertyOf), which has the same domain, inherited. rdfs:Resource is the class of
-     everything: its properties are the rdfs:Resource view of every term, not properties of this class. */
+  /* Each property that states the term as its rdfs:domain: one relationship from the term. A property of a class
+     above the term, or under such a property, is not one of these; the term that states it shows it. A row is a
+     property by its name and its comment; a property is a term, and selecting it shows its own fields. The rows
+     are one list, in the order of the property names. */
   propertyRows(iri) {
-    const statements = this.statements;
-    const classes = [iri, ...statements.above(iri, SUBCLASS_OF).filter(cls => cls !== RESOURCE)];
-    const rows = [];
-    const seen = new Set();
-    for (const cls of classes) {
-      if (!this.isShown(DOMAIN)) break;
-      const attached = statements.pointingAt(cls)
-        .filter(x => x.property === DOMAIN && this.isShown(x.subject))
-        .map(x => x.subject);
-      for (const property of this.map.order([...new Set(attached)])) {
-        if (!seen.has(property)) {
-          seen.add(property);
-          rows.push({ iri: property, cls, note: null });
-        }
-        for (const under of this.map.order(statements.below(property, SUBPROPERTY_OF))) {
-          if (seen.has(under) || !this.isShown(under)) continue;
-          seen.add(under);
-          rows.push({ iri: under, cls, note: { text: ' domain inherited from ', iri: property } });
-        }
-      }
-    }
-    return rows;
+    if (!this.isShown(DOMAIN)) return [];
+    const attached = this.statements.pointingAt(iri)
+      .filter(each => each.property === DOMAIN && this.isShown(each.subject))
+      .map(each => each.subject);
+    return [...new Set(attached)]
+      .sort((a, b) => this.sortName(a).localeCompare(this.sortName(b)))
+      .map(property => ({
+        iri: property,
+        id: this.statements.idOf(property),
+        /* the color says the prefix, so the name is shown without it */
+        label: this.nameOf(property),
+        comment: this.statements.text(property, COMMENT),
+        definedBy: this.statements.values(property, IS_DEFINED_BY)[0] || '',
+      }));
   }
 
-  /* The rows in groups, one for each value of rdfs:isDefinedBy, in the order of its name; the rows that have none
-     come last. In a group, the term's own properties come first, then those of each class above it, under that
-     class; each list is in the order of the property names. */
-  groupsOf(iri, rows) {
-    const classes = [...new Set(rows.map(row => row.cls))];
-    return this.definedBys(rows).map(definedBy => {
-      const lists = [];
-      for (const cls of classes) {
-        const here = rows.filter(row => row.cls === cls && this.definedBy(row.iri) === definedBy);
-        if (!here.length) continue;
-        here.sort((a, b) => this.sortName(a.iri).localeCompare(this.sortName(b.iri)));
-        lists.push({ from: cls === iri ? null : cls, rows: this.rowsOf(here, cls, definedBy) });
-      }
-      return { definedBy, name: definedBy ? this.statements.prefixName(definedBy) : '', lists };
-    });
-  }
-
-  /* A property is a resource too: each row is shown by the views of its own classes, under its name and its
-     comment. What the list already says is not shown again: the classes every property of the list has (their
-     views have no heading, and an rdf:type to one of them is not shown), the rdfs:isDefinedBy of the group, and the
-     rdfs:domain the list is under. */
-  rowsOf(rows, cls, definedBy) {
-    const statements = this.statements;
-    const classesOfRow = rows.map(row => this.classesOf(row.iri));
-    const shared = classesOfRow.reduce((common, classes) => common.filter(each => classes.includes(each)));
-    return rows.map((row, i) => {
-      const leaveOut = new Set([LABEL, COMMENT]);
-      if (definedBy) leaveOut.add(IS_DEFINED_BY);
-      if (statements.values(row.iri, TYPE).every(type => shared.includes(type))) leaveOut.add(TYPE);
-      if (statements.values(row.iri, DOMAIN).every(domain => domain === cls)) leaveOut.add(DOMAIN);
-      const blocks = this.blocksOf(row.iri, classesOfRow[i], leaveOut)
-        .map(block => shared.includes(block.heading) ? { ...block, heading: null } : block);
-      return {
-        iri: row.iri,
-        label: statements.text(row.iri, LABEL),
-        comment: statements.text(row.iri, COMMENT),
-        note: row.note,
-        blocks,
-      };
-    });
-  }
-
-  /* rdfs:isDefinedBy selects which properties the list shows, one value at a time: each value, named by its prefix */
+  /* rdfs:isDefinedBy selects which properties the list shows, one value at a time: each value among the rows, named
+     by its prefix, in the order of the names */
   tabsOf(rows) {
-    return this.definedBys(rows).filter(Boolean).map(iri => ({ iri, name: this.statements.prefixName(iri) }));
-  }
-
-  /* the values of rdfs:isDefinedBy among the rows, in the order of their names; '' for the rows with none, last */
-  definedBys(rows) {
-    const name = iri => this.statements.prefixName(iri);
-    return [...new Set(rows.map(row => this.definedBy(row.iri)))]
-      .sort((a, b) => (a === '') - (b === '') || name(a).localeCompare(name(b)));
-  }
-
-  definedBy(iri) {
-    return this.statements.values(iri, IS_DEFINED_BY)[0] || '';
+    return [...new Set(rows.map(row => row.definedBy))]
+      .filter(Boolean)
+      .map(iri => ({ iri, name: this.statements.prefixName(iri) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /* ---------- names ---------- */
 
+  /* the name of a property as the key of a field: its label, or its name without the prefix */
   nameOf(iri) {
-    return this.statements.text(iri, LABEL) || this.statements.short(iri);
+    return this.statements.text(iri, LABEL) || TermMap.bare(this.statements.short(iri));
   }
 
   tipOf(iri) {

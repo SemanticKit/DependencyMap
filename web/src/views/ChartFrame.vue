@@ -39,7 +39,7 @@ watch(() => props.data, render);
   <div id="onion-wrap">
     <div id="onion" ref="box"></div>
     <div id="legend" aria-label="Prefixes">
-      <div v-for="p in prefixes" :key="p"><span class="sw" :style="{ background: map.colorOf(p) }"></span>{{ p }}</div>
+      <div v-for="p in prefixes.filter(Boolean)" :key="p"><span class="sw" :style="{ background: map.colorOf(p) }"></span>{{ p }}</div>
     </div>
   </div>
 </template>

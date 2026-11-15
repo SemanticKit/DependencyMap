@@ -3,6 +3,7 @@
 import N3 from 'n3';
 
 const { namedNode } = N3.DataFactory;
+const LABEL = 'http://www.w3.org/2000/01/rdf-schema#label';
 const isIri = term => term.termType === 'NamedNode';
 const isBlank = term => term.termType === 'BlankNode';
 /* how far up a blank node is followed to the term it belongs to */
@@ -31,11 +32,14 @@ export class Statements {
     return this.map.short(iri);
   }
 
-  /* the name of an ontology: the prefix whose namespace is its IRI */
+  /* The name of an ontology: the prefix whose namespace is its IRI. An ontology with no prefix is named by what it
+     calls itself (rdfs:label), and one that says nothing by the last part of its IRI. The whole IRI is not a name. */
   prefixName(iri) {
     const found = this.map.names.namespaces.find(each => each.ns === iri || each.ns === iri + '#' || each.ns === iri + '/');
     if (found) return found.used;
-    return this.short(iri).replace(/^<|>$/g, '').replace(/:$/, '');
+    const label = this.text(iri, LABEL);
+    if (label) return label;
+    return iri.replace(/[#/]+$/, '').split(/[#/]/).pop();
   }
 
   /* a property, and each property the ontologies put under it (rdfs:subPropertyOf) */

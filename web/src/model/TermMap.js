@@ -11,6 +11,12 @@ import { TYPE, PROPERTY, CLASS, DATATYPE, LABEL, COMMENT, SUBCLASS_OF, SUBPROPER
 const LINES = [['', ''], ['2 3', ''], ['', '2.3'], ['7 3', '2.3'], ['9 3 2 3', ''], ['2 3', '2.3']];
 const REFERENCE_LINE = ['1 5', '1'];
 
+/* how the colours of the prefixes are spread: the step around the rainbow from one prefix to the next, the
+   lightnesses (of the HCL colour space) they take in turn, and the most chroma any has, so none glares */
+const GOLDEN_RATIO = 0.618033988749895;
+const LIGHTNESSES = [78, 58, 68];
+const CHROMA = 45;
+
 /* the properties that say what a term is in the vocabulary: a term that has one, or is the value of one, is not data */
 const STRUCTURE = [SUBCLASS_OF, SUBPROPERTY_OF, DOMAIN, RANGE];
 
@@ -32,8 +38,16 @@ export class TermMap {
     /* the ids of the terms, in the order of their names */
     this.ids = [...this.tierByTerm.keys()].sort();
     this.prefixes = [...new Set(Object.keys(this.analysis.terms).map(id => this.prefixOf(id)))].sort();
-    /* one colour for each prefix, none used twice: a D3 ordinal scale over D3's rainbow */
-    this.palette = d3.scaleOrdinal(this.prefixes, d3.quantize(d3.interpolateRainbow, this.prefixes.length + 1));
+    /* One colour for each prefix, none used twice: a D3 ordinal scale over D3's rainbow. Each prefix is a golden
+       ratio step around the rainbow from the one before it, and one of three lightnesses, so prefixes that are
+       next to each other in the alphabet are far apart in colour. */
+    const colours = this.prefixes.map((prefix, i) => {
+      const colour = d3.hcl(d3.interpolateRainbow((i * GOLDEN_RATIO) % 1));
+      colour.l = LIGHTNESSES[i % LIGHTNESSES.length];
+      colour.c = Math.min(colour.c, CHROMA);
+      return colour.formatHex();
+    });
+    this.palette = d3.scaleOrdinal(this.prefixes, colours);
     this.ontologies = this.findOntologies();
     this.individuals = this.findIndividuals();
     this.edgeGroups = this.findEdgeGroups();

@@ -1,28 +1,18 @@
-<!-- A property that has the term of the sheet in its domain, shown as a term: its name and its comment, then its
-     fields, one block for each of its views. A block has the class of its view as heading, unless every property
-     of the list has that class. -->
+<!-- A property that has the shown term as its domain: its name and its comment. Its prefix is its description
+     (aria-description). Selecting it shows its own fields. -->
 <script setup>
+import { computed } from 'vue';
 import TermRef from './TermRef.vue';
-import TermField from './TermField.vue';
+import { map } from '../../state.js';
 
-defineProps({ row: { type: Object, required: true } });
+const props = defineProps({ row: { type: Object, required: true } });
+
+const prefix = computed(() => map.value.prefixOf(props.row.id));
 </script>
 
 <template>
-  <div class="term-view item">
-    <div>
-      <TermRef :iri="row.iri" :label="row.label" />
-      <span v-if="row.note" class="class-cap">{{ row.note.text }}<TermRef :iri="row.note.iri" /></span>
-      <div v-if="row.comment" class="item-note">{{ row.comment }}</div>
-    </div>
-    <template v-for="(block, i) in row.blocks" :key="i">
-      <div v-if="block.heading" class="item-view">
-        <div class="view-cap"><TermRef :iri="block.heading" /></div>
-        <TermField v-for="(field, j) in block.fields" :key="j" :field="field" />
-      </div>
-      <template v-else>
-        <TermField v-for="(field, j) in block.fields" :key="j" :field="field" />
-      </template>
-    </template>
-  </div>
+  <li class="term-view item" :aria-description="prefix">
+    <TermRef :iri="row.iri" :label="row.label" />
+    <div v-if="row.comment" class="item-note">{{ row.comment }}</div>
+  </li>
 </template>

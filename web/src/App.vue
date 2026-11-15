@@ -1,9 +1,9 @@
-<!-- The page: the map, and the sheet with the details of the selected term. -->
+<!-- The page: the map, and the sheet with the details of the selection. -->
 <script setup>
 import { onMounted, onBeforeUnmount } from 'vue';
 import MapTab from './components/MapTab.vue';
 import TermSheet from './components/TermSheet.vue';
-import { app, openSheet, clearSelection } from './state.js';
+import { app, clearSelection } from './state.js';
 import { addFiles } from './storage.js';
 
 /* Files dropped anywhere on the page are added. While files are dragged over the page, the page shows it. */
@@ -36,12 +36,9 @@ function endDrag() {
 /* Escape folds the sheet down; with the sheet down it clears the selection */
 function keydown(event) {
   if (event.key !== 'Escape') return;
-  if (app.sheet.state === 'open') {
-    openSheet(false);
-    return;
-  }
   const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
-  if (app.selection.size && !typing) clearSelection();
+  if (app.sheetOpen && app.selection.size) app.sheetOpen = false;
+  else if (app.selection.size && !typing) clearSelection();
 }
 
 const listeners = { dragenter, dragleave, dragover, drop, keydown };

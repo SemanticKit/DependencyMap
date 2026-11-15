@@ -1,39 +1,47 @@
-<!-- The sheet at the foot of the page with the details of the selected term. It is folded down to its name, or open. -->
+<!-- The sheet along the foot of the page with the details of the selection. Its bar has the name of the selected
+     term at its start and, in its middle, the tabs of the views of the term (term/TermTabs.vue). A click on a tab opens the sheet over the map on that view
+     (term/TermView.vue); a click anywhere outside the sheet closes it. Several selected terms are listed by name in
+     the bar. -->
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue';
-import TermBody from './term/TermBody.vue';
-import { TermDetails } from '../model/TermDetails.js';
-import { map, app, isShown, openSheet, sheetBack } from '../state.js';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import TermButton from './TermButton.vue';
+import TermTabs from './term/TermTabs.vue';
+import TermView from './term/TermView.vue';
+import { TermMap } from '../model/TermMap.js';
+import { map, app } from '../state.js';
 
+const sheet = ref(null);
 const body = ref(null);
-/* the term of the sheet, when the sheet is on the page */
-const term = computed(() => {
-  const id = app.sheet.id;
-  return app.sheet.state !== 'none' && id && map.value.term(id) ? id : null;
-});
-const isOpen = computed(() => app.sheet.state === 'open');
-const name = computed(() => term.value ? map.value.labelOf(term.value) || term.value : '');
-/* the details are worked out only while the sheet is open, and again when the term or what the map shows changes */
-const details = computed(() => term.value && isOpen.value ? new TermDetails(map.value, isShown).of(term.value) : null);
+const selected = computed(() => [...app.selection].sort());
+/* the selected term, when it is the only one */
+const one = computed(() => selected.value.length === 1 ? selected.value[0] : null);
+const isOpen = computed(() => app.sheetOpen && !!one.value);
 
-/* new details start at their top; an opened sheet takes the keyboard */
-watch(details, () => { if (body.value) body.value.scrollTop = 0; }, { flush: 'post' });
-watch(isOpen, async on => {
-  if (!on) return;
-  await nextTick();
-  if (body.value) body.value.focus();
-});
+/* another term or another view starts at its top */
+watch([one, () => app.termView], () => { if (body.value) body.value.scrollTop = 0; }, { flush: 'post' });
+
+/* a click outside the sheet closes it */
+function pointerdown(event) {
+  if (app.sheetOpen && sheet.value && !sheet.value.contains(event.target)) app.sheetOpen = false;
+}
+onMounted(() => document.addEventListener('pointerdown', pointerdown));
+onBeforeUnmount(() => document.removeEventListener('pointerdown', pointerdown));
 </script>
 
 <template>
-  <div v-show="term" class="sheet" :class="{ open: isOpen }" role="region" aria-label="Details of the selected term">
+  <div v-if="selected.length" ref="sheet" class="sheet" :class="{ open: isOpen }" role="region" aria-label="Details of the selection">
     <div class="sheet-head">
-      <button v-show="isOpen && app.sheet.back.length" class="btn" type="button" @click="sheetBack">Back</button>
-      <button class="sheet-headline" type="button" @click="openSheet(!isOpen)"><b :title="term">{{ name }}</b><span id="sheet-sub"></span></button>
-      <button class="btn primary" type="button" :aria-expanded="isOpen" @click="openSheet(!isOpen)">{{ isOpen ? 'Fold down' : 'Details' }}</button>
+      <template v-if="one">
+        <b :title="map.iriOf(one)">{{ TermMap.bare(one) }}</b>
+        <TermTabs :id="one" />
+      </template>
+      <template v-else>
+        <b>{{ selected.length }} terms selected</b>
+        <div class="names"><TermButton v-for="id in selected" :key="id" :id="id" from-side /></div>
+      </template>
     </div>
-    <div v-show="isOpen" ref="body" class="sheet-body" tabindex="-1">
-      <TermBody v-if="details" :details="details" />
+    <div v-if="isOpen" ref="body" class="sheet-body">
+      <TermView :id="one" />
     </div>
   </div>
 </template>

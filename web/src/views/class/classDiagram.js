@@ -13,14 +13,15 @@ import * as d3 from 'd3';
 
 /* the measures of a box */
 const NAME_HEIGHT = 28;
-const TITLE_HEIGHT = 16;
-const LINE_HEIGHT = 15;
+const TITLE_HEIGHT = 18;
+const LINE_HEIGHT = 17;
 const MIN_WIDTH = 84;
 const PADDING = 24;
-/* the fonts the drawing writes in, as the canvas names them */
+/* The fonts the drawing writes in, as the canvas names them. All text is one size: the name is heavier and a
+   title is in italics. */
 const NAME_FONT = '600 12px sans-serif';
-const TITLE_FONT = 'italic 9px sans-serif';
-const MEMBER_FONT = '11px sans-serif';
+const TITLE_FONT = 'italic 12px sans-serif';
+const MEMBER_FONT = '12px sans-serif';
 
 /* the room between two boxes */
 const GAP = 32;
@@ -226,9 +227,7 @@ function drawBoxes(svg, boxes, hooks) {
 
   /* the title of each group */
   drawn.append('text')
-    .attr('font-size', 9)
     .attr('font-style', 'italic')
-    .attr('fill-opacity', 0.7)
     .attr('text-anchor', 'middle')
     .selectAll()
     .data(box => box.titles.map(title => ({ ...title, x: box.width / 2 })))
@@ -240,8 +239,6 @@ function drawBoxes(svg, boxes, hooks) {
 
   /* the members */
   drawn.append('text')
-    .attr('font-size', 11)
-    .attr('fill-opacity', 0.85)
     .selectAll()
     .data(box => box.members)
     .join('tspan')

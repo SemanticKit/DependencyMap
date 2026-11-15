@@ -4,65 +4,73 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}
 img{max-width:100%}
 [hidden]:not([hidden=until-found i]){display:none!important}
+/* The colours. The grounds are neutral greys with no tint. Ink and muted text are both well above 7:1 against the
+   ground and the panel, and the accent above 7:1 as text. */
 :root{
-  --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2430; --muted:#5b6475; --rule:#d9dde5;
-  --accent:#2f5d8a; --root:#8a6d1f; --root-bg:#f3ead0; --cycle:#a33a2c; --cycle-bg:#f7e3df;
-  --up:#2f5d8a; --up-bg:#dce8f4; --down:#7a4b93; --down-bg:#ecdff3; --ext:#6c7280;
+  --bg:#f5f5f5; --panel:#ffffff; --ink:#141414; --muted:#474747; --rule:#c9c9c9;
+  --accent:#1a4f8f; --root:#6b5310; --root-bg:#f3ead0; --cycle:#8f2a1d; --cycle-bg:#f7e3df;
+  --up:#1a4f8f; --up-bg:#dce8f4; --down:#643a7c; --down-bg:#ecdff3; --ext:#474747;
   --v-rdf:#6f8fb3; --v-rdfs:#4f7d6a; --v-owl:#8a6aa8; --v-foaf:#b57a3a; --v-other:#8b8f98;
-  --f-display:"Source Serif 4", Georgia, serif;
-  --f-body:"IBM Plex Sans", system-ui, sans-serif;
-  --f-mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  /* All text is one of three sizes. small: controls, the names of terms on the map, keys and labels. text: what is
+     read. title: headings and the name of the selected term. */
+  --small:13px; --text:15px; --title:18px;
+  /* all text is in the typeface of the system the app runs on, the one its own windows and menus use */
+  --f-body:-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --f-display:var(--f-body);
+  --f-mono:var(--f-body);
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#12161d; --panel:#1a2029; --ink:#e3e7ee; --muted:#9aa3b2; --rule:#2c3440;
-  --accent:#7fb0e0; --root:#e0c06a; --root-bg:#3a3220; --cycle:#f08a7a; --cycle-bg:#3b2320;
-  --up:#7fb0e0; --up-bg:#1f3348; --down:#c79be0; --down-bg:#35264a; --ext:#9aa3b2;
+  --bg:#141414; --panel:#1e1e1e; --ink:#f2f2f2; --muted:#c2c2c2; --rule:#454545;
+  --accent:#9cc4f5; --root:#e0c06a; --root-bg:#3a3220; --cycle:#f5a093; --cycle-bg:#3b2320;
+  --up:#9cc4f5; --up-bg:#1f3348; --down:#d3b0e8; --down-bg:#35264a; --ext:#c2c2c2;
   --v-rdf:#7f9fc3; --v-rdfs:#6fa58d; --v-owl:#a98ac6; --v-foaf:#d09552; --v-other:#8b93a1; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#12161d; --panel:#1a2029; --ink:#e3e7ee; --muted:#9aa3b2; --rule:#2c3440;
-  --accent:#7fb0e0; --root:#e0c06a; --root-bg:#3a3220; --cycle:#f08a7a; --cycle-bg:#3b2320;
-  --up:#7fb0e0; --up-bg:#1f3348; --down:#c79be0; --down-bg:#35264a; --ext:#9aa3b2;
+  --bg:#141414; --panel:#1e1e1e; --ink:#f2f2f2; --muted:#c2c2c2; --rule:#454545;
+  --accent:#9cc4f5; --root:#e0c06a; --root-bg:#3a3220; --cycle:#f5a093; --cycle-bg:#3b2320;
+  --up:#9cc4f5; --up-bg:#1f3348; --down:#d3b0e8; --down-bg:#35264a; --ext:#c2c2c2;
   --v-rdf:#7f9fc3; --v-rdfs:#6fa58d; --v-owl:#a98ac6; --v-foaf:#d09552; --v-other:#8b93a1; color-scheme:dark}
-body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--f-body)}
+body{background:var(--bg);color:var(--ink);font:var(--text)/1.6 var(--f-body)}
 .wrap{max-width:1500px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 64px;display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
 .wrap>*{min-width:0}
 h2,h3{font-family:var(--f-display);font-weight:600;text-wrap:balance;line-height:1.25;margin:0}
-h2{font-size:1.35rem;margin-bottom:12px}
-h3{font-size:1.05rem;margin:18px 0 8px}
+h2{font-size:var(--title);margin-bottom:12px}
+h3{font-size:var(--title);margin:18px 0 8px}
 p{margin:0 0 12px}
 code,.mono{font-family:var(--f-mono);font-size:.88em}
 a{color:var(--accent)}
-.eyebrow{font:500 .75rem/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-.src{color:var(--muted);font:12px/1.5 var(--f-mono);overflow-wrap:anywhere}
+.eyebrow{font:500 var(--small)/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.src{color:var(--muted);font:var(--small)/1.5 var(--f-mono);overflow-wrap:anywhere}
 button{font-family:var(--f-body)}
 .seg{display:inline-flex;flex-wrap:wrap;gap:0;border:1px solid var(--rule);border-radius:4px;overflow:hidden}
-.seg button,.btn{font:500 13px var(--f-body);padding:6px 12px;border:0;background:var(--panel);color:var(--ink);cursor:pointer}
+.seg button,.btn{font:500 var(--small) var(--f-body);padding:6px 12px;border:0;background:var(--panel);color:var(--ink);cursor:pointer}
 .seg button+button{border-left:1px solid var(--rule)}
 .btn{border:1px solid var(--rule);border-radius:4px}
-.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel)}
+.seg button[aria-pressed="true"],.seg button[aria-selected="true"]{background:var(--accent);color:var(--panel)}
 button:focus-visible,input:focus-visible,summary:focus-visible,[role="button"]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .bar{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end}
 .ctl{display:grid;gap:4px;min-width:0}
-.ctl>span{font:500 .7rem/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.ctl input[type="text"]{font:14px var(--f-mono);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink);width:230px;max-width:100%;box-sizing:border-box}
+.ctl>span{font:500 var(--small)/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ctl input[type="text"]{font:var(--small) var(--f-mono);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink);width:230px;max-width:100%;box-sizing:border-box}
 .checks{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
-.checks label{display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;white-space:nowrap}
+.checks label{display:inline-flex;align-items:center;gap:5px;font-size:var(--small);cursor:pointer;white-space:nowrap}
 .checks svg{flex:none}
 .sw{display:inline-block;width:10px;height:10px;border-radius:2px}
-.status{font-size:13px;color:var(--muted);flex-basis:100%}
-.main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}
+.status{font-size:var(--small);color:var(--muted);flex-basis:100%}
+.main{display:grid;grid-template-columns:minmax(0,1fr);align-items:start}
 .main>*{min-width:0}
 .map{position:relative}
-.map svg.edges{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+/* the edges are drawn under the terms, so no line crosses a name */
+.map svg.edges{position:absolute;left:0;top:0;z-index:0;pointer-events:none;overflow:visible}
 .tier{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;padding:22px 0;border-top:1px solid var(--rule)}
 .tier:first-of-type{border-top:0}
-.tier h4{margin:0;font:600 .95rem var(--f-mono)}
-.tier h4 small{display:block;font:400 .75rem var(--f-body);color:var(--muted)}
+.tier h4{margin:0;font:600 var(--text) var(--f-mono)}
+.tier h4 small{display:block;font:400 var(--small) var(--f-body);color:var(--muted)}
 .units{display:flex;flex-wrap:wrap;gap:10px 6px;min-width:0;align-items:center}
-.term{font:13px/1.5 var(--f-mono);padding:2px 7px;border-radius:3px;border:1px solid var(--rule);border-left-width:3px;background:var(--bg);color:var(--ink);cursor:pointer;max-width:100%;overflow-wrap:anywhere;text-align:left}
+.term{font:var(--small)/1.5 var(--f-mono);padding:2px 7px;border-radius:3px;border:1px solid var(--rule);border-left-width:3px;background:var(--bg);color:var(--ink);cursor:pointer;max-width:100%;overflow-wrap:anywhere;text-align:left;position:relative;z-index:1}
 .term.v-rdf{border-left-color:var(--v-rdf)}.term.v-rdfs{border-left-color:var(--v-rdfs)}.term.v-owl{border-left-color:var(--v-owl)}.term.v-foaf{border-left-color:var(--v-foaf)}.term.v-other{border-left-color:var(--v-other)}
 .term.v-external{border-style:dashed;border-left-width:1px;color:var(--ext)}
-.term.dim{opacity:.28}
+/* a term outside the reach of the selection is set back, and its name can still be read */
+.term.dim{opacity:.6}
 .term.up{background:var(--up-bg);border-color:var(--up)}
 .term.down{background:var(--down-bg);border-color:var(--down)}
 .term.cyc{background:var(--cycle-bg);border-color:var(--cycle)}
@@ -77,134 +85,111 @@ button:focus-visible,input:focus-visible,summary:focus-visible,[role="button"]:f
 .e.k-mod{stroke-dasharray:1 5;stroke-width:1}
 .e.far{opacity:.2}
 .e.near{opacity:.85}
-/* The page is at least as high as the window: the map, and under it the sheet when it is folded down. The map
-   takes the height that the row of controls and the folded sheet leave. A chart fills that height; the Tiers view
-   is as high as its tiers and the page scrolls, with the folded sheet staying at the foot of the window. */
+/* The page is at least as high as the window, and the map takes the height that the row of controls leaves. A
+   chart fills that height; the Tiers view is as high as its tiers and the page scrolls. */
 #app{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;min-height:100dvh}
 .wrap{width:100%;box-sizing:border-box;grid-template-rows:minmax(0,1fr)}
-.sheet:not(.open){position:sticky}
 #view-map{grid-template-rows:auto minmax(0,1fr)}
 .main>.map{align-self:stretch}
 /* beside a chart the side panel is as high as the chart and scrolls inside itself, so it never makes the page higher */
-@media (min-width:901px){.main:has(#onion-wrap)>.right{align-self:stretch;contain:size;position:static;max-height:none}}
 #onion-wrap{position:relative;height:100%}
 #onion{position:absolute;inset:0}
 #onion-wrap[hidden]{display:none}
-#legend{position:absolute;top:0;right:0;font:12px/1.7 var(--f-mono);white-space:nowrap}
+/* the legend floats over the chart in a box of its own, in the lower left, as the legend of a map does; its
+   prefixes stand in as many columns as fit in half the width of the chart */
+#legend>div{flex:0 0 9em}
+#legend{position:absolute;bottom:1em;left:1em;max-width:50%;display:flex;flex-wrap:wrap;gap:0 1.5em;font:var(--small)/1.7 var(--f-mono);white-space:nowrap;background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:.6em 1em;box-shadow:0 8px 28px rgba(0,0,0,.18)}
 #legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 #onion{color:var(--ink)}
 #onion svg{display:block;width:100%;height:100%}
 /* with nothing selected, a chart has no side panel and takes the whole width */
-.main.solo{grid-template-columns:minmax(0,1fr)}
-.main.solo>.right{display:none}
 .wrap:has(#onion-wrap:not([hidden])){max-width:none}
-.side{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);max-height:calc(100vh - 24px);overflow:auto;box-sizing:border-box}
-.side h2{font-family:var(--f-mono);font-size:1.1rem;overflow-wrap:anywhere;margin-bottom:6px}
-.key{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;font-size:12px}
-.key .term{cursor:default;font-size:12px}
 .grp{display:grid;grid-template-columns:30px minmax(0,1fr);gap:4px 8px;margin-bottom:6px}
-.grp b{font:500 12px/2 var(--f-mono);color:var(--muted)}
-.grp div{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
-.side .term{font-size:12px}
+.grp b{font:500 var(--small)/2 var(--f-mono);color:var(--muted)}
+.grp div{display:flex;flex-wrap:wrap;gap:.2em 1em;min-width:0}
 details{border-top:1px solid var(--rule);padding:10px 0 4px}
-summary{cursor:pointer;font:600 1rem var(--f-display)}
-summary small{font:400 12px var(--f-mono);color:var(--muted);margin-left:6px}
+summary{cursor:pointer;font:600 var(--text) var(--f-display)}
+summary small{font:400 var(--small) var(--f-mono);color:var(--muted);margin-left:6px}
 details>*:not(summary){margin-top:8px}
 .scroll{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:.85rem}
+table{border-collapse:collapse;width:100%;font-size:var(--small)}
+/* Edges: the columns are equal shares of the width, so the table of edges out and the one of edges in line up */
+table.edge-list{table-layout:fixed}
+table.edge-list td{overflow-wrap:anywhere;white-space:normal}
 td,th{text-align:left;padding:4px 8px 4px 0;border-bottom:1px solid var(--rule);vertical-align:top}
-th{font-weight:500;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em}
-td.k{font-family:var(--f-mono);color:var(--muted);white-space:nowrap;font-size:12px}
-.empty{color:var(--muted);font-size:13px}
+th{font-weight:500;color:var(--muted);font-size:var(--small);text-transform:uppercase;letter-spacing:.05em}
+td.k{font-family:var(--f-mono);color:var(--muted);white-space:nowrap;font-size:var(--small)}
+.empty{color:var(--muted);font-size:var(--small)}
 .panel{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:20px;min-width:0}
 .cyc{border-left:3px solid var(--cycle);padding-left:14px;min-width:0}
 @media (max-width:900px){
   .main{grid-template-columns:minmax(0,1fr)}
-  .side{position:static;max-height:46vh;order:-1}
   .tier{grid-template-columns:minmax(0,1fr);gap:6px}
   .tier h4 small{display:inline;margin-left:8px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 
 .files{display:grid;gap:4px;min-width:0}
-.frow{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:13px;min-width:0}
+.frow{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:var(--small);min-width:0}
 .frow label{display:inline-flex;gap:6px;align-items:center;cursor:pointer;min-width:0}
 .frow .fname{font-family:var(--f-mono);overflow-wrap:anywhere}
-.frow .meta{color:var(--muted);font:12px var(--f-mono)}
-.frow .err{color:var(--cycle);font-size:12px;flex-basis:100%}
-.link{background:none;border:0;padding:0;color:var(--accent);font:13px var(--f-body);cursor:pointer;text-decoration:underline}
+.frow .meta{color:var(--muted);font:var(--small) var(--f-mono)}
+.frow .err{color:var(--cycle);font-size:var(--small);flex-basis:100%}
+.link{background:none;border:0;padding:0;color:var(--accent);font:var(--small) var(--f-body);cursor:pointer;text-decoration:underline}
 .link.danger{color:var(--cycle)}
 .wide{flex-basis:100%}
 .paste{display:grid;gap:8px;max-width:640px}
-.paste input,.paste textarea{font:13px var(--f-mono);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink);box-sizing:border-box;width:100%}
+.paste input,.paste textarea{font:var(--small) var(--f-mono);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink);box-sizing:border-box;width:100%}
 .paste textarea{min-height:140px;resize:vertical}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
 .btn[disabled]{opacity:.45;cursor:default}
 body.drag .bar{outline:2px dashed var(--accent);outline-offset:3px}
 .blank{padding:40px 8px;color:var(--muted);max-width:60ch}
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--panel);border-top:2px solid var(--accent);box-shadow:0 -8px 28px rgba(0,0,0,.18);display:grid;grid-template-rows:auto minmax(0,1fr);max-height:86%;padding-bottom:env(safe-area-inset-bottom,0px)}
-.sheet-head{display:flex;gap:10px;align-items:center;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));min-width:0}
-.sheet-headline{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;background:none;border:0;padding:0;color:var(--ink);cursor:pointer;text-align:left}
-.sheet-headline b{font:600 1.05rem var(--f-mono);overflow-wrap:anywhere}
-.sheet-headline span{color:var(--muted);font-size:13px;overflow-wrap:anywhere;flex-basis:100%}
-.sheet-headline span:empty,.sheet:not(.open) .sheet-headline span{display:none}
-.sheet.open{height:86%}
-.sheet.open .sheet-head{border-bottom:1px solid var(--rule)}
-.sheet-body{overflow:auto;padding-block:20px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));animation:fold .2s ease-out}
-@keyframes fold{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-.object{max-width:1100px;min-width:0}
+/* ---------- the details of a term ----------
+   One scale for type and one for space, set on the sheet and used by everything in it.
+   Type: meta for keys, the IRI and counts; body for what is read; lead for the comment and the headings. Prose is in
+   the body face. The name of a term and the IRI are in the mono face, as on the map.
+   Colour: ink for what is read, muted for keys and the IRI only, the accent for what can be clicked.
+   Space: s1 inside a pair, s2 between a key and the next, s3 between lines of one group, s4 between items, s5
+   between the parts of a view. Text is no wider than the measure. */
+.sheet{--meta:var(--small);--body:var(--text);--lead:var(--title);--s1:.25rem;--s2:.5rem;--s3:1rem;--s4:1.5rem;--s5:2.5rem;--measure:80ch;font-size:var(--body);line-height:1.6}
 .term-view{min-width:0}
-.term-view.top{display:grid;gap:12px;padding-bottom:24px}
-h2.v-label{font:600 2rem/1.15 var(--f-display);margin:0}
-.v-comment p{margin:0;max-width:72ch;white-space:pre-wrap}
-.top .v-comment p{font-size:1.08rem}
-.v-line{display:grid;grid-template-columns:130px minmax(0,1fr);gap:2px 16px;align-items:baseline}
-.cap{font:500 .72rem var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+/* The fields of a term: a description list with a column of names and a column of values. A field whose values are
+   terms has them beside its name, one to a line; a field whose values are text has them under its name, across both
+   columns. */
+.fields{display:grid;grid-template-columns:fit-content(40%) minmax(0,1fr);gap:var(--s2) var(--s4);margin:0;min-width:0}
+.field{display:grid;grid-template-columns:subgrid;grid-column:1/-1;gap:var(--s1) var(--s4);align-items:baseline;min-width:0}
+.field dt{grid-column:1;font-size:var(--meta);color:var(--muted)}
+.field dd{grid-column:2;margin:0;min-width:0;max-width:var(--measure);overflow-wrap:anywhere}
+.field.text dt,.field.text dd{grid-column:1/-1}
+.field dd>small{margin-left:var(--s2);font-size:var(--meta);color:var(--muted)}
 .refs,.sig{display:inline-flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;min-width:0}
 .sep,.arrow{color:var(--muted)}
-.pfx summary{cursor:pointer;font:500 .7rem/1.6 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pfx summary{cursor:pointer;font:500 var(--small)/1.6 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .pfx{display:block;min-width:0;max-width:100%;overflow:hidden}.pfx .tablewrap{overflow-x:auto;max-width:100%}
 .pfx-table td{overflow-wrap:anywhere}
-.pfx-table{border-collapse:collapse;font-size:13px;margin-top:6px}
+.pfx-table{border-collapse:collapse;font-size:var(--small);margin-top:6px}
 .pfx-table td{padding:4px 16px 4px 0;vertical-align:top;border-top:1px solid var(--rule)}
-.pfx-table select{font:13px var(--f-mono);padding:2px 4px;background:var(--bg);color:var(--ink);border:1px solid var(--rule);border-radius:4px}
+.pfx-table select{font:var(--small) var(--f-mono);padding:2px 4px;background:var(--bg);color:var(--ink);border:1px solid var(--rule);border-radius:4px}
 .attached{border-top:1px solid var(--rule);margin-top:6px}
-.term-view.top{padding-bottom:0}
-.class-view{display:grid;gap:12px;padding:16px 0 20px;border-top:1px solid var(--rule)}
-.class-view:first-child{border-top:0;padding-top:0}
-/* one size for each meaning: a view (a class) > a group (rdfs:isDefinedBy) > a term > a key and its values; a comment is one size everywhere */
-.class-cap{font-size:12px;color:var(--muted)}
-.view-cap,.view-cap .tlink{font:600 15px var(--f-mono);color:var(--ink)}
-.view-cap{padding:6px 0 4px}
-/* in Properties: a group (rdfs:isDefinedBy) holds the lists of the classes the properties come from */
-.group-cap{font:600 14px var(--f-mono);color:var(--ink)}
-.from-cap,.from-cap .tlink{font:600 13px var(--f-mono);color:var(--muted)}
-.from-cap{padding:8px 0 2px}
-.group-cap{padding:10px 0 4px}
-.term-view.item>div:first-child>.tlink{font:600 14px var(--f-mono)}
-.item-note,#sheet-sub{font-size:13px;color:var(--muted);margin-top:2px}
-.term-note{margin:0 0 16px;max-width:72ch;white-space:pre-wrap}
-.item-view{padding-top:6px}
-.prop-tabs{justify-self:start;margin:2px 0 6px}
-.items>.items~.items>.term-view.item:first-child{border-top:1px solid var(--rule);padding-top:10px}
-.attached h3{margin:0 0 4px}
-.term-view.item{padding:10px 0;border-top:1px solid var(--rule);display:grid;gap:3px}
-.items .term-view.item:first-child{border-top:0;padding-top:0}
-.items{min-width:0}
-.sub-val small{margin-left:6px;font-size:11px;color:var(--muted)}
-.item .v-line{grid-template-columns:130px minmax(0,1fr)}
-.vals{display:flex;flex-wrap:wrap;gap:2px 14px;min-width:0}
-.vals.text{display:grid;gap:6px}
-.attached .term-view.item:first-of-type{border-top:0}
-.item .v-label{font:600 1rem var(--f-body);color:var(--ink)}
-.item .v-comment{grid-column:2;color:var(--muted);font-size:.92rem}
-@media (max-width:700px){.v-line,.item .v-line{grid-template-columns:minmax(0,1fr)}.item .v-comment{grid-column:1}}
-.lit small{font:400 11px var(--f-mono);color:var(--muted);margin-left:6px}
+.class-view{display:grid;gap:var(--s3);align-content:start;min-width:0}
+.class-view h3{font:600 var(--lead)/1.3 var(--f-body);margin:0}
+/* the RDF view: what the term states, then the properties that have it as their domain */
+.rdf-view{gap:var(--s5)}
+.definition{display:grid;gap:var(--s3);align-content:start;min-width:0}
+.definition p{margin:0}
+.definition .src{font:var(--meta)/1.5 var(--f-mono);color:var(--muted)}
+.term-note{font-size:var(--lead);line-height:1.5;max-width:var(--measure);white-space:pre-wrap}
+.prop-tabs{justify-self:start}
+/* Properties: one list, each property under the one before it: its name, then its comment */
+.items{display:grid;gap:var(--s4);margin:0;padding:0;list-style:none;min-width:0}
+.term-view.item{display:grid;gap:var(--s1);align-content:start}
+.term-view.item>.tlink{justify-self:start}
+.item-note{max-width:var(--measure)}
+.lit small{font:400 var(--meta) var(--f-mono);color:var(--muted);margin-left:var(--s2)}
 .lit span{white-space:pre-wrap}
-.tlink{background:none;border:0;padding:0;font:500 .9rem var(--f-mono);color:var(--accent);cursor:pointer;text-align:left;overflow-wrap:anywhere}
+.tlink{background:none;border:0;padding:0;font:400 1em var(--f-mono);color:var(--accent);cursor:pointer;text-align:left;overflow-wrap:anywhere}
 .tlink:hover{text-decoration:underline;text-underline-offset:3px}
-
-@media (prefers-reduced-motion:reduce){.sheet-body{animation:none}}
 :root{--v-xsd:#3f8f9b;--c0:#b0487a;--c1:#5a7f2e;--c2:#a35f1c;--c3:#3b6fb5;--c4:#7d5bb0;--c5:#2e8a7a}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--v-xsd:#5fb3bf;--c0:#e08ab0;--c1:#9cc46a;--c2:#d99a5a;--c3:#7fa8e0;--c4:#b59be0;--c5:#6cc4b4}}
 :root[data-theme="dark"]{--v-xsd:#5fb3bf;--c0:#e08ab0;--c1:#9cc46a;--c2:#d99a5a;--c3:#7fa8e0;--c4:#b59be0;--c5:#6cc4b4}
@@ -213,17 +198,30 @@ h2.v-label{font:600 2rem/1.15 var(--f-display);margin:0}
 .wrap{padding-block:16px;gap:12px}
 #view-map{gap:12px!important}
 .bar{gap:8px;align-items:center;position:relative;z-index:20}
-.bar>select{font:500 13px var(--f-body);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--panel);color:var(--ink);max-width:260px}
-.bar>input[type="search"]{font:14px var(--f-mono);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink);width:260px;max-width:100%;box-sizing:border-box}
+.bar>select{font:500 var(--small) var(--f-body);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--panel);color:var(--ink);max-width:260px}
+.bar>input[type="search"]{font:var(--small) var(--f-mono);padding:6px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink);width:260px;max-width:100%;box-sizing:border-box}
 .pop{border:0;padding:0;position:relative}
-.pop>summary{list-style:none;font:500 13px var(--f-body);padding:6px 12px;border:1px solid var(--rule);border-radius:4px;background:var(--panel)}
+.pop>summary{list-style:none;font:500 var(--small) var(--f-body);padding:6px 12px;border:1px solid var(--rule);border-radius:4px;background:var(--panel)}
 .pop>summary::-webkit-details-marker{display:none}
 .pop>summary::after{content:" ▾";color:var(--muted)}
 .pop[open]>summary{border-color:var(--accent)}
 .pop-body{position:absolute;top:calc(100% + 6px);left:0;z-index:40;background:var(--panel);border:1px solid var(--rule);border-radius:6px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:12px 14px;width:min(720px,calc(100vw - 32px));max-height:70vh;overflow:auto;display:grid;gap:12px;box-sizing:border-box;margin-top:0!important}
 #filters-pop .pop-body{left:auto;right:0}
 @media (max-width:700px){.pop{position:static}.pop-body,#filters-pop .pop-body{left:0;right:0;width:auto}}
-.status{flex-basis:auto;font-size:12px}
-.right{display:grid;gap:12px;align-content:start;min-width:0;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);max-height:calc(100vh - 24px);overflow:auto}
-.right .side{position:static;max-height:none}
-@media (max-width:900px){.right{position:static;max-height:none;order:-1}.right .side{max-height:46vh}}
+.status{flex-basis:auto;font-size:var(--small)}
+/* The details sheet. Folded down, it is the foot of the page and stays at the foot of the window. Open, it lies
+   over the map. */
+.sheet{position:sticky;bottom:0;z-index:30;background:var(--panel);border-top:1px solid var(--rule);box-shadow:0 -8px 28px rgba(0,0,0,.18);display:grid;grid-template-rows:auto minmax(0,1fr);padding-bottom:env(safe-area-inset-bottom,0px)}
+.sheet.open{position:fixed;left:0;right:0;max-height:86%}
+.sheet-head>b{font:600 var(--lead)/1.3 var(--f-mono);overflow-wrap:anywhere}
+/* the bar: the name at its start, the tabs in its middle */
+.sheet-head>.seg{grid-column:2}
+.sheet-head>.names{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:.2em 1em;min-width:0}
+.sheet-head{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:var(--s2) var(--s4);align-items:center;padding-block:var(--s2);padding-left:max(var(--s4),env(safe-area-inset-left,0px));padding-right:max(var(--s4),env(safe-area-inset-right,0px));min-width:0}
+.sheet.open .sheet-head{border-bottom:1px solid var(--rule)}
+.sheet-body{overflow:auto;padding-block:var(--s4) var(--s5);padding-left:max(var(--s4),env(safe-area-inset-left,0px));padding-right:max(var(--s4),env(safe-area-inset-right,0px))}
+.part{display:grid;gap:.6em;align-content:start;min-width:0}
+.part h3{margin:0}
+.part h3 small{font:400 var(--small) var(--f-mono);color:var(--muted);margin-left:.6em}
+/* a view that has two parts shows them side by side where there is room */
+.side-by-side{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(24em,100%),1fr));gap:1em 3em;align-items:start}
