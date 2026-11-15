@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SemanticKit Dependency Map</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
+</head>
+<body>
+<div id="app"></div>
+<!-- The N3 library and the analysis engine are served by the app as they are: the engine is the same file that
+     depmap-cli.js and the server run. -->
+<script src="/vendor/n3.min.js"></script>
+<script src="/depmap-core.js"></script>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

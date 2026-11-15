@@ -15,8 +15,6 @@ const { createMcpServer } = require('./lib/mcp');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 
-const CHUNK = 80000; /* the size of the parts the page reads a file in */
-
 /* The root of the project: the nearest folder, from the one the app is started in upwards, that holds .git.
    The app runs no program to find it. Where no folder holds .git, it is the folder the app is started in. */
 function projectRoot() {
@@ -43,79 +41,61 @@ function createApp({ data, port }) {
   const store = new Store(data);
   const map = new DependencyMap(store);
   const clients = new Set(); /* open pages: server-sent event streams */
-  const generic = new Map(); /* documents other than files/, such as graph/summary: kept while the app runs */
-  const pending = new Map(); /* id -> Map(n -> text): parts of a file the page is uploading */
 
   const send = (res, ev, payload) => res.write('event: ' + ev + '\ndata: ' + JSON.stringify(payload) + '\n\n');
-  const fileDocs = () => store.list().map(m => ({ id: m.id, data: { name: m.name, format: m.format, enabled: m.enabled, rev: m.rev, bytes: m.bytes, addedAt: m.addedAt } }));
-  store.on('change', () => { const docs = fileDocs(); for (const c of clients) send(c, 'files', docs); });
+  /* the files as the page lists them: each { id, name, format, enabled, rev, bytes, addedAt } */
+  store.on('change', () => { const files = store.list(); for (const c of clients) send(c, 'files', files); });
   const pages = { select(iris) { for (const c of clients) send(c, 'select', iris); return clients.size; } };
 
-  /* The page's database: files/<id> are the files on disk; files/<id>/chunks/<n> are parts of their text. */
-  const seg = p => String(p || '').split('/').filter(Boolean);
-  const safe = s => s.every(x => /^[A-Za-z0-9_\-.~:@+]{1,200}$/.test(x) && x !== '.' && x !== '..');
-  function chunksOf(id) {
-    const p = pending.get(id);
-    if (p) return [...p.keys()].sort((a, b) => a - b).map(n => ({ id: String(n).padStart(4, '0'), data: { text: p.get(n) } }));
-    const f = store.list().find(x => x.id === id); if (!f) return [];
-    const text = store.text(id), out = [];
-    for (let i = 0; i * CHUNK < text.length || i === 0; i++) out.push({ id: String(i).padStart(4, '0'), data: { text: text.slice(i * CHUNK, (i + 1) * CHUNK) } });
-    return out;
-  }
-  function getDoc(p) {
-    const s = seg(p);
-    if (s[0] === 'files' && s.length === 2) { const d = fileDocs().find(x => x.id === s[1]); return d ? d.data : null; }
-    if (s[0] === 'files' && s.length === 4 && s[2] === 'chunks') { const c = chunksOf(s[1]).find(x => x.id === s[3]); return c ? c.data : null; }
-    return generic.has(s.join('/')) ? generic.get(s.join('/')) : null;
-  }
-  function listCol(p, limit) {
-    const s = seg(p);
-    if (s[0] === 'files' && s.length === 1) return fileDocs().slice(0, limit);
-    if (s[0] === 'files' && s.length === 3 && s[2] === 'chunks') return chunksOf(s[1]).slice(0, limit);
-    const pre = s.join('/') + '/', out = [];
-    for (const [k, v] of generic) if (k.startsWith(pre) && !k.slice(pre.length).includes('/')) out.push({ id: k.slice(pre.length), data: v });
-    return out.slice(0, limit);
-  }
-  function writeDoc(p, op, data) {
-    const s = seg(p);
-    if (s[0] === 'files' && s.length === 4 && s[2] === 'chunks') {
-      const n = Number(s[3]);
-      if (op === 'delete') { const q = pending.get(s[1]); if (q) q.delete(n); return; }
-      if (!pending.has(s[1])) pending.set(s[1], new Map());
-      pending.get(s[1]).set(n, String(data && data.text || ''));
-      return;
-    }
-    if (s[0] === 'files' && s.length === 2) {
-      const id = s[1];
-      if (op === 'delete') { pending.delete(id); store.remove(id); return; }
-      if (op === 'update') {
-        if (data && 'enabled' in data && !store.setEnabled(id, data.enabled)) throw Object.assign(new Error('No such file.'), { code: 'not-found' });
-        return;
+  /* The files, for the page:
+       GET    /api/files        the list
+       POST   /api/files        { name, text }: a new file, or the new text of the file with this name
+       GET    /api/files/<id>   the text of a file
+       PATCH  /api/files/<id>   { enabled }: turn a file on or off
+       DELETE /api/files/<id>   remove a file */
+  async function files(req, res, id) {
+    if (!id) {
+      if (req.method === 'GET') return out(res, 200, store.list());
+      if (req.method === 'POST') {
+        const b = await body(req) || {};
+        return out(res, 200, map.writeFile(String(b.name || '').trim(), String(b.text || '')));
       }
-      let text = typeof data.text === 'string' ? data.text : null;
-      if (text === null) {
-        const q = pending.get(id) || new Map(), n = Number(data.chunks) || 0, parts = [];
-        for (let i = 0; i < n; i++) { if (!q.has(i)) throw Object.assign(new Error('Part ' + i + ' of the file is missing.'), { code: 'invalid-argument' }); parts.push(q.get(i)); }
-        text = parts.join('');
-      }
-      pending.delete(id);
-      map.writeFile(data.name || id, text);
-      return;
+      return out(res, 405, { message: 'Method not allowed.' });
     }
-    const k = s.join('/');
-    if (op === 'delete') generic.delete(k);
-    else if (op === 'update') generic.set(k, Object.assign({}, generic.get(k), data));
-    else generic.set(k, data);
+    const file = store.list().find(f => f.id === id);
+    if (!file) return out(res, 404, { message: 'No such file.' });
+    if (req.method === 'GET') {
+      res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+      return res.end(store.text(id));
+    }
+    if (req.method === 'PATCH') {
+      const b = await body(req) || {};
+      store.setEnabled(id, b.enabled !== false);
+      return out(res, 200, { ok: true });
+    }
+    if (req.method === 'DELETE') {
+      store.remove(id);
+      return out(res, 200, { ok: true });
+    }
+    return out(res, 405, { message: 'Method not allowed.' });
   }
 
-  const pub = path.join(__dirname, 'public');
+  /* The page is built from web/ into dist/ (npm run build). Its own files are in dist/assets, under names the
+     build gives them. The analysis engine and the N3 library are served as they are. */
+  const dist = path.join(__dirname, 'dist');
   const statics = {
-    '/': [path.join(pub, 'index.html'), 'text/html; charset=utf-8'],
-    '/local.js': [path.join(pub, 'local.js'), 'text/javascript; charset=utf-8'],
+    '/': [path.join(dist, 'index.html'), 'text/html; charset=utf-8'],
     '/depmap-core.js': [path.join(__dirname, 'depmap-core.js'), 'text/javascript; charset=utf-8'],
     '/vendor/n3.min.js': [require.resolve('n3/browser/n3.min.js'), 'text/javascript; charset=utf-8'],
-    '/vendor/d3.min.js': [path.join(path.dirname(require.resolve('d3')), '..', 'dist', 'd3.min.js'), 'text/javascript; charset=utf-8'],
   };
+  const assetTypes = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.map': 'application/json; charset=utf-8' };
+  /* a file of the built page, by its name alone: no path in the request reaches outside dist/assets */
+  function asset(pathname) {
+    if (!pathname.startsWith('/assets/')) return null;
+    const name = path.basename(pathname), type = assetTypes[path.extname(name)];
+    const f = path.join(dist, 'assets', name);
+    return type && fs.existsSync(f) ? [f, type] : null;
+  }
 
   /* Only this computer, by its own name: no other origin can call the app (DNS rebinding, cross-site requests). */
   const hostOk = h => /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(String(h || ''));
@@ -134,8 +114,10 @@ function createApp({ data, port }) {
   async function handle(req, res) {
     const u = new URL(req.url, 'http://localhost');
     if (!hostOk(req.headers.host) || !originOk(req.headers.origin, req.headers.host)) { res.writeHead(403); res.end('Forbidden'); return; }
-    if (req.method === 'GET' && statics[u.pathname]) {
-      const [f, type] = statics[u.pathname];
+    const file = req.method === 'GET' ? statics[u.pathname] || asset(u.pathname) : null;
+    if (file) {
+      const [f, type] = file;
+      if (!fs.existsSync(f)) { res.writeHead(503, { 'content-type': 'text/plain; charset=utf-8' }); res.end('The page is not built yet. Run "npm run build" in the DependencyMap folder, then load this page again.'); return; }
       res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' }); fs.createReadStream(f).pipe(res); return;
     }
     if (u.pathname === '/mcp') {
@@ -150,7 +132,7 @@ function createApp({ data, port }) {
     }
     if (u.pathname === '/api/events' && req.method === 'GET') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
-      clients.add(res); send(res, 'files', fileDocs());
+      clients.add(res); send(res, 'files', store.list());
       const ping = setInterval(() => res.write(': ping\n\n'), 25000);
       req.on('close', () => { clearInterval(ping); clients.delete(res); });
       return;
@@ -160,15 +142,12 @@ function createApp({ data, port }) {
       out(res, 200, map.environment());
       return;
     }
-    try {
-      if (u.pathname === '/api/doc' && req.method === 'GET') { const d = getDoc(u.searchParams.get('path')); out(res, 200, { exists: d !== null, data: d }); return; }
-      if (u.pathname === '/api/collection' && req.method === 'GET') { out(res, 200, { docs: listCol(u.searchParams.get('path'), Number(u.searchParams.get('limit')) || 1000) }); return; }
-      if (u.pathname === '/api/doc' && req.method === 'POST') {
-        const b = await body(req) || {};
-        if (!safe(seg(b.path)) || !['set', 'update', 'delete'].includes(b.op)) { out(res, 400, { code: 'invalid-argument', message: 'Bad path or operation.' }); return; }
-        writeDoc(b.path, b.op, b.data || {}); out(res, 200, { ok: true }); return;
-      }
-    } catch (e) { out(res, 400, { code: e.code || 'error', message: String(e && e.message || e) }); return; }
+    const filePath = /^\/api\/files(?:\/([^/]+))?$/.exec(u.pathname);
+    if (filePath) {
+      try { await files(req, res, filePath[1] ? decodeURIComponent(filePath[1]) : null); }
+      catch (e) { out(res, 400, { message: String(e && e.message || e) }); }
+      return;
+    }
     res.writeHead(404); res.end('Not found');
   }
 

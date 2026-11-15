@@ -4,14 +4,28 @@
   "license": "GPL-2.0-only",
   "description": "SemanticKit Dependency Map: a local web app with an MCP server",
   "type": "commonjs",
-  "bin": { "semantickit-depmap": "server.js" },
-  "scripts": { "start": "node server.js", "test": "node test/smoke.js" },
-  "engines": { "node": ">=20" },
+  "bin": {
+    "semantickit-depmap": "server.js"
+  },
+  "scripts": {
+    "build": "vite build",
+    "prepare": "vite build",
+    "start": "node server.js",
+    "test": "node test/smoke.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
     "@xmldom/xmldom": "0.9.12",
     "d3": "7.9.2",
     "n3": "1.17.2",
+    "vue": "3.5.45",
     "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.11",
+    "vite": "8.3.8"
   }
 }

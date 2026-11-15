@@ -30,6 +30,10 @@ async function check(client, label) {
   for (const v of [where.folder, where.docs]) assert(v.startsWith('/') || v.startsWith('$PROJECT_DIR'), 'a path is whole or starts at the root');
   assert(where.env && typeof where.env.PATH === 'string', 'environment gives the variables');
   assert.deepStrictEqual(tools, ['enable_file', 'environment', 'files', 'find', 'load_file', 'order', 'read_file', 'remove_file', 'select', 'summary', 'term', 'terms_in', 'write_file']);
+  const prompts = (await client.listPrompts()).prompts.map(p => p.name).sort();
+  assert.deepStrictEqual(prompts, ['build_order', 'what_first']);
+  const asked = await client.getPrompt({ name: 'what_first', arguments: { id: 'rdfs:Class' } });
+  assert(asked.messages[0].content.text.includes('rdfs:Class'), 'the prompt names the term');
   const cli = JSON.parse(execFileSync(process.execPath, [path.join(app, 'depmap-cli.js'), ...names.map(n => path.join(inputs, n)), '--json'], { maxBuffer: 1 << 28 }));
   const sum = await call('summary');
   assert.strictEqual(sum.terms, Object.keys(cli.terms).length, 'terms');
