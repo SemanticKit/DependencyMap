@@ -52,7 +52,7 @@ export class TermDetails {
   classesOf(iri) {
     const statements = this.statements;
     const stated = [RESOURCE, ...statements.values(iri, TYPE)];
-    for (const statement of statements.about(iri)) stated.push(...this.domainOf(statement.p));
+    for (const statement of statements.about(iri)) stated.push(...this.domainOf(statement.predicate.value));
     for (const { property } of statements.pointingAt(iri)) stated.push(...this.rangeOf(property));
 
     const classes = [];
@@ -112,7 +112,7 @@ export class TermDetails {
      of a property is a value of each property above it (RDF 1.2 Schema 2.2.5), so a property whose super-property
      the map shows is not a field of its own: its values are in the field of that super-property, under its name. */
   fieldProperties(iri, leaveOut) {
-    const stated = [...new Set(this.statements.about(iri).map(statement => statement.p))];
+    const stated = [...new Set(this.statements.about(iri).map(statement => statement.predicate.value))];
     const fields = new Map();
     for (const property of this.map.order(stated).filter(this.isShown)) {
       const top = this.topShown(property);
@@ -156,15 +156,15 @@ export class TermDetails {
   valuesOf(iri, property) {
     /* rdfs:Resource is the class of everything (RDF 1.2 Schema 2.1.1): a statement that something is in it, or
        that a class is under it, says nothing */
-    const saysNothing = value => value.t === 'iri' && value.v === RESOURCE && this.rangeOf(property).includes(CLASS);
+    const saysNothing = value => value.termType === 'NamedNode' && value.value === RESOURCE && this.rangeOf(property).includes(CLASS);
     const values = [];
     for (const statement of this.statements.about(iri)) {
-      if (statement.p !== property || saysNothing(statement.o)) continue;
-      if (statement.o.t === 'lit') {
-        values.push({ literal: this.literal(statement.o) });
+      if (statement.predicate.value !== property || saysNothing(statement.object)) continue;
+      if (statement.object.termType === 'Literal') {
+        values.push({ literal: this.literal(statement.object) });
         continue;
       }
-      for (const value of this.statements.irisIn(statement.o, statement.file)) {
+      for (const value of this.statements.irisIn(statement.object, statement.graph)) {
         if (this.isShown(value)) values.push({ iri: value });
       }
     }
@@ -173,9 +173,10 @@ export class TermDetails {
 
   /* a literal with what it says of itself: its language, or its datatype when that is not a plain string */
   literal(value) {
-    if (value.l) return { text: value.v, tag: '@' + value.l };
-    if (value.d && !/#string$/.test(value.d)) return { text: value.v, tag: this.statements.short(value.d) };
-    return { text: value.v, tag: '' };
+    if (value.language) return { text: value.value, tag: '@' + value.language };
+    const datatype = value.datatype ? value.datatype.value : '';
+    if (datatype && !/#string$/.test(datatype)) return { text: value.value, tag: this.statements.short(datatype) };
+    return { text: value.value, tag: '' };
   }
 
   /* The range of a property says what its values are: a literal range gives text, each other range gives links. */

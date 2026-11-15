@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "license": "GPL-2.0-only",
   "description": "SemanticKit Dependency Map: a local web app with an MCP server",
-  "type": "commonjs",
+  "type": "module",
   "bin": {
     "semantickit-depmap": "server.js"
   },
@@ -17,10 +17,16 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@ldo/ldo": "^1.0.0-alpha.51",
+    "@ldo/schema-converter-shex": "^1.0.0-alpha.51",
     "@modelcontextprotocol/sdk": "1.32.2",
-    "@xmldom/xmldom": "0.9.12",
     "d3": "7.9.2",
+    "graphology": "^0.26.0",
+    "graphology-components": "^1.5.4",
+    "graphology-dag": "^0.4.1",
+    "graphology-traversal": "^0.3.1",
     "n3": "1.17.2",
+    "rdfxml-streaming-parser": "^3.3.0",
     "vue": "3.5.45",
     "zod": "4.6.7"
   },

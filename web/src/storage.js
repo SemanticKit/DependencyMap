@@ -1,6 +1,6 @@
 /* The files of the map. The app keeps them, on disk in the project; the page lists them, reads their text, and asks
    the app to add, switch or remove one. The app tells each open page when the files change. */
-import { engine, parsing } from './model/engine.js';
+import { loadOntology } from '../../core/ontology.mjs';
 import { files, map, app, say, setFiles, select } from './state.js';
 import { request } from './http.js';
 
@@ -31,18 +31,17 @@ async function load(listed) {
   setFiles(next);
 }
 
-/* a file of the app, read: its text, its triples and its prefixes, or the error that stopped the reading */
+/* an ontology of the app, loaded: its statements and its prefixes, or the error that stopped the loading */
 async function read(record) {
-  const file = { id: record.id, name: record.name, rev: record.rev, format: record.format, count: 0, triples: null, error: null };
+  const file = { id: record.id, name: record.name, rev: record.rev, format: record.format, count: 0, quads: null, prefixes: null, error: null };
   try {
     const response = await fetch(fileUrl(file), { cache: 'no-store' });
     if (!response.ok) throw new Error('the app answered ' + response.status);
-    const text = await response.text();
-    file.format = file.format || engine.detectFormat(file.name, text);
-    const parsed = engine.parse(file.name, text, file.format, parsing);
-    file.triples = parsed.triples;
-    file.prefixes = parsed.prefixes;
-    file.count = parsed.triples.length;
+    const loaded = await loadOntology(file.name, await response.text(), file.format || undefined);
+    file.format = loaded.format;
+    file.quads = loaded.quads;
+    file.prefixes = loaded.prefixes;
+    file.count = loaded.quads.length;
   } catch (e) {
     file.error = 'This file could not be read: ' + String(e && e.message || e).slice(0, 300);
   }

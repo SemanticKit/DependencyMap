@@ -1,46 +1,84 @@
 #!/usr/bin/env node
 /* SemanticKit dependency map, command line.
    Setup, one time, in this directory:  npm install
-   Use:  node depmap-cli.js <file>... [--term <id or IRI>] [--order] [--json]
-   Files are Turtle, N-Triples or RDF/XML. Term ids are compact names (owl:Class) or <IRI>. */
-const fs=require('fs'),path=require('path');
-const C=require('./depmap-core.js');
-let N3,DOMParser;
-try{N3=require('n3');({DOMParser}=require('@xmldom/xmldom'))}catch(e){console.error('Run "npm install" in '+__dirname+' first.');process.exit(2)}
-const args=process.argv.slice(2),files=[],opt={};
-for(let i=0;i<args.length;i++){const a=args[i];
-  if(a==='--term') (opt.term=opt.term||[]).push(args[++i]);else if(a==='--order') opt.order=true;else if(a==='--json') opt.json=true;
-  else if(a==='-h'||a==='--help') opt.help=true;else files.push(a)}
-if(opt.help||!files.length){console.log(fs.readFileSync(__filename,'utf8').split('\n').slice(1,6).join('\n'));process.exit(files.length?0:1)}
-const parsed=[];
-for(const f of files){const name=path.basename(f);
-  try{parsed.push(Object.assign({name},C.parse(name,fs.readFileSync(f,'utf8'),null,{N3,DOMParser})))}
-  catch(e){console.error(name+': could not be read: '+e.message);process.exit(1)}}
-const g=C.analyze(parsed),ix=C.index(g);
-const fx=C.facts(parsed),ids=new Map(Object.keys(g.terms).map(id=>[g.terms[id].i,id]));
-const nss=Object.keys(g.prefixes).map(p=>[g.prefixes[p],p]).sort((a,b)=>b[0].length-a[0].length);
-const short=iri=>{if(ids.has(iri)) return ids.get(iri);for(const [ns,p] of nss) if(iri.indexOf(ns)===0&&!/[\/#?]/.test(iri.slice(ns.length))) return p+':'+iri.slice(ns.length);return '<'+iri+'>'};
-const val=(o,file,d)=>o.t==='iri'?short(o.v):o.t==='lit'?JSON.stringify(o.v)+(o.l?'@'+o.l:''):d>6?'[]':'[ '+(fx.bn.get(file+'\u0000'+o.v)||[]).map(t=>short(t.p)+' '+val(t.o,file,d+1)).join(' ; ')+' ]';
-const statements=iri=>(fx.subj.get(iri)||[]).map(t=>({property:short(t.p),value:val(t.o,t.file,0),file:t.file}));
-const find=t=>{if(g.terms[t]) return t;const iri=t.replace(/^<|>$/g,'');return Object.keys(g.terms).find(id=>g.terms[id].i===iri)};
-if(opt.term){
-  const out=opt.term.map(t=>{const id=find(t);if(!id) return {id:t,error:'No term with this name in the files.'};const d=C.describe(g,ix,id);d.label=C.text(fx,d.iri,C.family(fx,C.RDFS+'label'));d.comment=C.text(fx,d.iri,C.family(fx,C.RDFS+'comment'));d.statements=statements(d.iri);return d});
-  if(opt.json){console.log(JSON.stringify(out,null,1))}
-  else for(const d of out){
-    if(d.error){console.log(d.id+': '+d.error);continue}
-    console.log(d.id+'  <'+d.iri+'>');
-    console.log('  declared in: '+d.declaredIn.join(', ')+'   tier: '+d.tier+(d.unit.length>1?'   cycle: '+d.unit.join(', '):''));
-    console.log('  has to happen first ('+d.hasToHappenFirst.length+'):');
-    const by={};for(const x of d.hasToHappenFirst)(by[ix.tier[x]]=by[ix.tier[x]]||[]).push(x);
-    for(const t of Object.keys(by)) console.log('    T'+t+'  '+by[t].join(' '));
-    console.log('  waits for it ('+d.waitsForIt.length+')'+(d.waitsForIt.length?': '+d.waitsForIt.join(' '):''));
-    console.log('  statements ('+d.statements.length+'):');for(const x of d.statements) console.log('    '+x.property+' '+x.value+'   ['+x.file+']');
+   Use:  node depmap-cli.js <ontology>... [--term <id or IRI>] [--order] [--json]
+   Ontologies are Turtle, N-Triples or RDF/XML. Term ids are compact names (owl:Class) or <IRI>. */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { loadOntology } from './core/ontology.mjs';
+import { DependencyMap } from './core/map.mjs';
+
+const chosen = { paths: [], terms: [], order: false, json: false, help: false };
+const args = process.argv.slice(2);
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
+  if (arg === '--term') chosen.terms.push(args[++i]);
+  else if (arg === '--order') chosen.order = true;
+  else if (arg === '--json') chosen.json = true;
+  else if (arg === '-h' || arg === '--help') chosen.help = true;
+  else chosen.paths.push(arg);
+}
+if (chosen.help || !chosen.paths.length) {
+  console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 5).join('\n'));
+  process.exit(chosen.paths.length ? 0 : 1);
+}
+
+const ontologies = [];
+for (const file of chosen.paths) {
+  const name = path.basename(file);
+  try {
+    ontologies.push({ enabled: true, ...await loadOntology(name, fs.readFileSync(file, 'utf8')) });
+  } catch (e) {
+    console.error(name + ': could not be read: ' + e.message);
+    process.exit(1);
   }
-}else if(opt.json){console.log(JSON.stringify(g))}
-else if(opt.order){for(const t of g.tiers) for(const u of t.groups) console.log('T'+t.tier+'\t'+u.join(' '))}
-else{
-  console.log('files:  '+Object.entries(g.triples).map(([n,c])=>n+' ('+c+' triples)').join(', '));
-  console.log('terms:  '+Object.keys(g.terms).length+'   edges: '+g.edges.length);
-  for(const t of g.tiers) console.log('tier '+t.tier+': '+t.groups.reduce((a,u)=>a+u.length,0)+' terms');
-  console.log('cycles: '+g.cycles.length);for(const c of g.cycles) console.log('  T'+c.tier+'  '+c.terms.join(' '));
+}
+const map = new DependencyMap(ontologies);
+
+/* the answer for a term, or why there is none */
+function answerFor(name) {
+  try {
+    return map.term(name);
+  } catch (e) {
+    return { id: name, error: e.message };
+  }
+}
+
+function printTerm(term) {
+  if (term.error) {
+    console.log(term.id + ': ' + term.error);
+    return;
+  }
+  console.log(term.id + '  <' + term.iri + '>');
+  console.log('  declared in: ' + term.declaredIn.join(', ') + '   tier: ' + term.tier + (term.unit.length > 1 ? '   cycle: ' + term.unit.join(', ') : ''));
+  console.log('  has to happen first (' + term.hasToHappenFirst.length + '):');
+  for (const tier of map.tiers) {
+    const here = term.hasToHappenFirst.filter(id => map.tierOf.get(id) === tier.tier);
+    if (here.length) console.log('    T' + tier.tier + '  ' + here.join(' '));
+  }
+  console.log('  waits for it (' + term.waitsForIt.length + ')' + (term.waitsForIt.length ? ': ' + term.waitsForIt.join(' ') : ''));
+  console.log('  statements (' + term.statements.length + '):');
+  for (const statement of term.statements) console.log('    ' + statement.property + ' ' + statement.value + '   [' + statement.ontology + ']');
+}
+
+function printSummary() {
+  const summary = map.summary();
+  console.log('ontologies:  ' + summary.ontologies.map(each => each.name + ' (' + each.triples + ' triples)').join(', '));
+  console.log('terms:  ' + summary.terms + '   edges: ' + summary.edges);
+  for (const tier of summary.tiers) console.log('tier ' + tier.tier + ': ' + tier.terms + ' terms');
+  console.log('cycles: ' + summary.cycles.length);
+  for (const cycle of summary.cycles) console.log('  T' + cycle.tier + '  ' + cycle.terms.join(' '));
+}
+
+if (chosen.terms.length) {
+  const answers = chosen.terms.map(answerFor);
+  if (chosen.json) console.log(JSON.stringify(answers, null, 1));
+  else answers.forEach(printTerm);
+} else if (chosen.json) {
+  console.log(JSON.stringify({ summary: map.summary(), order: map.order(), terms: map.terms, edges: map.edges }));
+} else if (chosen.order) {
+  for (const { tier, unit } of map.order()) console.log('T' + tier + '\t' + unit.join(' '));
+} else {
+  printSummary();
 }

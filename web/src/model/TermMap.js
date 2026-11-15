@@ -1,7 +1,9 @@
-/* The map: what the loaded files give. It is made once from the files and is not changed after; when a file or a
-   prefix choice changes, the page makes a new one. It knows nothing of the controls of the page. */
+/* The map as the page shows it: the map of the core (core/map.mjs), with what only the page needs, such as the
+   colour of each prefix and the line of each edge group. It is made once from the loaded ontologies and is not
+   changed after; when an ontology or a prefix choice changes, the page makes a new one. It knows nothing of the
+   controls of the page. */
 import * as d3 from 'd3';
-import { engine } from './engine.js';
+import { DependencyMap } from '../../../core/map.mjs';
 import { Statements } from './Statements.js';
 import { TYPE, PROPERTY, CLASS, DATATYPE, LABEL, COMMENT, SUBCLASS_OF, SUBPROPERTY_OF, DOMAIN, RANGE, IS_DEFINED_BY } from '../rdf.js';
 
@@ -13,20 +15,17 @@ const REFERENCE_LINE = ['1 5', '1'];
 const STRUCTURE = [SUBCLASS_OF, SUBPROPERTY_OF, DOMAIN, RANGE];
 
 export class TermMap {
-  /* files: every loaded file. chosenPrefixes: for a namespace with several prefixes, the one to use. */
+  /* files: every loaded ontology, each { name, enabled, quads, prefixes }. chosenPrefixes: for a namespace with
+     several prefixes, the one to use. */
   constructor(files, chosenPrefixes) {
     this.files = files;
-    const on = files.filter(file => file.enabled && file.triples);
-    const bindings = files.filter(file => file.prefixes).map(file => ({ name: file.name, prefixes: file.prefixes }));
-    this.analysis = engine.analyze(
-      on.map(file => ({ name: file.name, triples: file.triples, prefixes: file.prefixes })),
-      { bindings, choose: { ...chosenPrefixes } },
-    );
-    this.statements = new Statements(on, this.analysis);
+    this.core = new DependencyMap(files, { ...chosenPrefixes });
+    this.analysis = this.core.analysis;
+    this.statements = new Statements(this.core);
     this.tiers = this.analysis.tiers;
     this.cycles = this.analysis.cycles;
     this.edges = this.analysis.edges;
-    this.namespaces = this.analysis.namespaces || [];
+    this.namespaces = this.analysis.namespaces;
 
     this.indexTiers();
     this.indexEdges();
@@ -223,7 +222,7 @@ export class TermMap {
       const iri = this.iriOf(id);
       const types = statements.values(iri, TYPE);
       if (!types.length || types.some(isMeta)) continue;
-      if (statements.about(iri).some(statement => STRUCTURE.includes(statement.p))) continue;
+      if (statements.about(iri).some(statement => STRUCTURE.includes(statement.predicate.value))) continue;
       if (statements.pointingAt(iri).some(x => x.property === TYPE || STRUCTURE.includes(x.property))) continue;
       found.add(id);
     }

@@ -1,90 +1,118 @@
-'use strict';
-/* Starts the app on a new data folder with the files of test/inputs, connects an MCP client over HTTP and over
-   standard input and output, and checks the answers against depmap-cli.js on the same files. */
-const assert = require('assert');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { execFileSync } = require('child_process');
-const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
-const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
-const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
-const { createApp } = require('../server.js');
+/* Starts the app on a new, empty project, loads the ontologies of test/inputs as the page does, connects an MCP
+   client over HTTP and over standard input and output, and checks the answers against depmap-cli.js on the same
+   ontologies. */
+import assert from 'node:assert';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { createApp } from '../server.js';
 
-const app = path.join(__dirname, '..');
-const inputs = path.join(__dirname, 'inputs');
+const app = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const inputs = path.join(app, 'test', 'inputs');
 const names = ['rdf.ttl', 'rdfs.ttl', 'rdf-xsd.ttl', 'owl.ttl'];
 let docs; /* the docs folder of the test project */
+let port; /* the port of the app under test */
+
+/* what the command line says of the same ontologies */
+function cli(...args) {
+  const out = execFileSync(process.execPath, [path.join(app, 'depmap-cli.js'), ...names.map(name => path.join(inputs, name)), ...args, '--json'], { maxBuffer: 1 << 28 });
+  return JSON.parse(out);
+}
+
+/* load an ontology of test/inputs into the app, as the page does */
+async function load(name) {
+  const text = fs.readFileSync(path.join(inputs, name), 'utf8');
+  const response = await fetch('http://localhost:' + port + '/api/files', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, text }) });
+  assert(response.ok, 'load ' + name + ': ' + (await response.text()));
+}
 
 async function check(client, label) {
-  const call = async (name, args) => {
-    const r = await client.callTool({ name, arguments: args || {} });
-    assert(!r.isError, label + ' ' + name + ': ' + (r.content[0] && r.content[0].text));
-    const t = r.content[0].text;
-    try { return JSON.parse(t); } catch (_) { return t; }
+  const call = async (name, given) => {
+    const result = await client.callTool({ name, arguments: given || {} });
+    assert(!result.isError, label + ' ' + name + ': ' + (result.content[0] && result.content[0].text));
+    const text = result.content[0].text;
+    try { return JSON.parse(text); } catch (_) { return text; }
   };
-  const tools = (await client.listTools()).tools.map(t => t.name).sort();
-  const where = await call('environment');
-  assert(where.docs.endsWith('/docs'), 'environment gives the docs folder');
-  assert(typeof where.PROJECT_DIR === 'string' && where.PROJECT_DIR.startsWith('/'), 'environment gives the project root');
-  for (const v of [where.folder, where.docs]) assert(v.startsWith('/') || v.startsWith('$PROJECT_DIR'), 'a path is whole or starts at the root');
-  assert(where.env && typeof where.env.PATH === 'string', 'environment gives the variables');
-  assert.deepStrictEqual(tools, ['enable_file', 'environment', 'files', 'find', 'load_file', 'order', 'read_file', 'remove_file', 'select', 'summary', 'term', 'terms_in', 'write_file']);
-  const prompts = (await client.listPrompts()).prompts.map(p => p.name).sort();
+  const refused = async (why, given) => assert((await client.callTool({ name: 'create', arguments: given })).isError, why);
+
+  /* the tools and the prompts */
+  const tools = (await client.listTools()).tools.map(tool => tool.name).sort();
+  assert.deepStrictEqual(tools, ['create', 'environment', 'find', 'order', 'select', 'summary', 'term', 'terms_in']);
+  const prompts = (await client.listPrompts()).prompts.map(prompt => prompt.name).sort();
   assert.deepStrictEqual(prompts, ['build_order', 'what_first']);
   const asked = await client.getPrompt({ name: 'what_first', arguments: { id: 'rdfs:Class' } });
   assert(asked.messages[0].content.text.includes('rdfs:Class'), 'the prompt names the term');
-  const cli = JSON.parse(execFileSync(process.execPath, [path.join(app, 'depmap-cli.js'), ...names.map(n => path.join(inputs, n)), '--json'], { maxBuffer: 1 << 28 }));
-  const sum = await call('summary');
-  assert.strictEqual(sum.terms, Object.keys(cli.terms).length, 'terms');
-  assert.strictEqual(sum.edges, cli.edges.length, 'edges');
-  assert.deepStrictEqual(sum.cycles, cli.cycles, 'cycles');
-  const order = await call('order');
-  assert.deepStrictEqual(order, cli.tiers.flatMap(t => t.groups.map(u => ({ tier: t.tier, unit: u }))), 'order');
-  const cliTerm = JSON.parse(execFileSync(process.execPath, [path.join(app, 'depmap-cli.js'), ...names.map(n => path.join(inputs, n)), '--term', 'owl:cardinality', '--json']))[0];
-  const term = await call('term', { id: 'owl:cardinality' });
-  for (const k of ['iri', 'tier', 'unit', 'hasToHappenFirst', 'waitsForIt', 'statements', 'label', 'comment']) assert.deepStrictEqual(term[k], cliTerm[k], 'term ' + k);
+
+  /* a type is a resource: one for each class of the loaded ontologies, read for its properties */
+  const types = (await client.listResources()).resources.map(resource => resource.name);
+  for (const name of ['rdfs:Class', 'rdfs:Datatype', 'rdf:Property', 'owl:Class', 'owl:ObjectProperty']) assert(types.includes(name), label + ' has the type ' + name);
+  const read = await client.readResource({ uri: 'http://www.w3.org/2000/01/rdf-schema#Class' });
+  const definition = JSON.parse(read.contents[0].text);
+  assert.strictEqual(definition.id, 'rdfs:Class');
+  assert(definition.above.includes('rdfs:Resource'), 'a type says what is above it');
+  assert.deepStrictEqual(definition.properties.find(property => property.id === 'rdfs:subClassOf'), { name: 'subClassOf', id: 'rdfs:subClassOf', takes: ['rdfs:Class'], values: 'many' });
+
+  /* the app says where it runs */
+  const where = await call('environment');
+  assert(where.docs.endsWith('/docs'), 'environment gives the docs folder');
+  assert(typeof where.PROJECT_DIR === 'string' && where.PROJECT_DIR.startsWith('/'), 'environment gives the project root');
+  assert(where.env && typeof where.env.PATH === 'string', 'environment gives the variables');
+
+  /* the map answers as the command line does */
+  const told = cli();
+  const summary = await call('summary');
+  assert.deepStrictEqual({ ...summary, ontologies: summary.ontologies.map(each => each.name).sort() }, { ...told.summary, ontologies: names.slice().sort() }, 'summary');
+  assert.deepStrictEqual(await call('order'), told.order, 'order');
+  assert.deepStrictEqual(await call('term', { id: 'owl:cardinality' }), cli('--term', 'owl:cardinality')[0], 'term');
   assert((await call('find', { text: 'subclassof' })).includes('rdfs:subClassOf'));
   assert((await call('terms_in', { name: 'rdfs.ttl' })).includes('rdfs:Class'));
-  assert.strictEqual(await call('read_file', { name: 'rdfs.ttl' }), fs.readFileSync(path.join(inputs, 'rdfs.ttl'), 'utf8'));
-  const added = await call('write_file', { name: 'extra.ttl', text: '@prefix ex: <http://example.org/> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\nex:A a rdfs:Class ; rdfs:subClassOf ex:B .\nex:B a rdfs:Class .\n' });
-  assert.strictEqual(added.triples, 3);
-  assert(fs.existsSync(path.join(docs, 'ex', 'extra.ttl')), 'a new file goes to docs/<alias>/<name>');
-  const a = await call('term', { id: 'ex:A' });
-  assert(a.hasToHappenFirst.includes('ex:B') && a.hasToHappenFirst.includes('rdfs:Class'), 'ex:A');
-  await call('enable_file', { name: 'extra.ttl', enabled: false });
-  assert(!(await call('find', { text: 'example.org' })).length, 'off');
-  await call('remove_file', { name: 'extra.ttl' });
-  assert(!(await call('files')).includes('extra.ttl'));
-  const bad = await client.callTool({ name: 'write_file', arguments: { name: 'bad.ttl', text: 'this is not turtle' } });
-  assert(bad.isError);
-  const sel = await call('select', { ids: ['rdfs:Class'] });
-  assert.deepStrictEqual(sel.selected, ['rdfs:Class']);
-  console.log(label + ': ' + tools.length + ' tools; ' + sum.terms + ' terms, ' + sum.edges + ' edges, ' + sum.cycles.length + ' cycles; answers match depmap-cli.js');
+  assert.deepStrictEqual((await call('select', { ids: ['rdfs:Class'] })).selected, ['rdfs:Class']);
+
+  /* create makes a term of a type, and checks each value against the property it is for */
+  const made = await call('create', { type: 'rdfs:Class', id: 'rdfs:Smoke', properties: { label: 'Smoke', subClassOf: ['rdfs:Resource'] } });
+  assert.deepStrictEqual(made, { id: 'rdfs:Smoke', type: 'rdfs:Class', statements: 3, ontology: 'rdfs.ttl' });
+  const smoke = await call('term', { id: 'rdfs:Smoke' });
+  assert(smoke.hasToHappenFirst.includes('rdfs:Resource') && smoke.hasToHappenFirst.includes('rdfs:Class'), 'rdfs:Smoke');
+  await refused('a value that is not of the type of the property', { type: 'rdfs:Class', id: 'rdfs:Smoke2', properties: { subClassOf: ['rdfs:label'] } });
+  await refused('a value that is not a loaded term', { type: 'rdfs:Class', id: 'rdfs:Smoke2', properties: { subClassOf: ['rdfs:Nothing'] } });
+  await refused('a property the type does not have', { type: 'rdfs:Class', id: 'rdfs:Smoke2', properties: { nothing: 'x' } });
+  await refused('a type that is not loaded', { type: 'rdfs:Nothing', id: 'rdfs:Smoke2' });
+  /* back to the ontology as it was */
+  await load('rdfs.ttl');
+
+  console.log(label + ': ' + tools.length + ' tools, ' + types.length + ' types; ' + summary.terms + ' terms, ' + summary.edges + ' edges, ' + summary.cycles.length + ' cycles; answers match depmap-cli.js');
 }
 
-(async () => {
-  /* an empty project: the app makes docs and the folder of each ontology when a file is loaded */
-  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'depmap-test-'));
-  docs = path.join(data, 'docs');
-  const port = 4900 + Math.floor(Math.random() * 500);
-  const a = createApp({ data, port });
-  await new Promise(ok => a.httpServer.listen(port, '127.0.0.1', ok));
-  try {
-    const http = new Client({ name: 'smoke', version: '1' });
-    await http.connect(new StreamableHTTPClientTransport(new URL('http://localhost:' + port + '/mcp')));
-    assert(!fs.existsSync(docs), 'nothing is made before a file is loaded');
-    for (const n of names) {
-      const r = await http.callTool({ name: 'load_file', arguments: { path: path.join(inputs, n) } });
-      assert(!r.isError, 'load_file ' + n + ': ' + (r.content[0] && r.content[0].text));
-    }
-    for (const [folder, n] of [['rdf', 'rdf.ttl'], ['rdfs', 'rdfs.ttl'], ['xsd', 'rdf-xsd.ttl'], ['owl', 'owl.ttl']])
-      assert(fs.existsSync(path.join(docs, folder, n)), n + ' is in docs/' + folder);
-    await check(http, 'HTTP');
-    await http.close();
-    const stdio = new Client({ name: 'smoke', version: '1' });
-    await stdio.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(app, 'server.js'), '--stdio', '--port', String(port)], cwd: data, stderr: 'ignore' }));
-    await check(stdio, 'stdio');
-    await stdio.close();
-  } finally { a.close(); fs.rmSync(data, { recursive: true, force: true }); }
-})().catch(e => { console.error(e); process.exit(1); });
+/* an empty project: the app makes docs and the folder of each ontology when one is loaded */
+const data = fs.mkdtempSync(path.join(os.tmpdir(), 'depmap-test-'));
+docs = path.join(data, 'docs');
+port = 4900 + Math.floor(Math.random() * 500);
+const running = createApp({ data });
+await new Promise(done => running.httpServer.listen(port, '127.0.0.1', done));
+try {
+  assert(!fs.existsSync(docs), 'nothing is made before an ontology is loaded');
+  for (const name of names) await load(name);
+  for (const [folder, name] of [['rdf', 'rdf.ttl'], ['rdfs', 'rdfs.ttl'], ['xsd', 'rdf-xsd.ttl'], ['owl', 'owl.ttl']]) {
+    assert(fs.existsSync(path.join(docs, folder, name)), name + ' is in docs/' + folder);
+  }
+  const http = new Client({ name: 'smoke', version: '1' });
+  await http.connect(new StreamableHTTPClientTransport(new URL('http://localhost:' + port + '/mcp')));
+  await check(http, 'HTTP');
+  await http.close();
+
+  const stdio = new Client({ name: 'smoke', version: '1' });
+  await stdio.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(app, 'server.js'), '--stdio', '--port', String(port)], cwd: data, stderr: 'ignore' }));
+  await check(stdio, 'stdio');
+  await stdio.close();
+} catch (e) {
+  console.error(e);
+  process.exitCode = 1;
+} finally {
+  running.close();
+  fs.rmSync(data, { recursive: true, force: true });
+}
