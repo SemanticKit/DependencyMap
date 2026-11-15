@@ -23,13 +23,15 @@ const RANGE = RDFS + 'range';
 const LABEL = RDFS + 'label';
 const COMMENT = RDFS + 'comment';
 const EQUIVALENT_CLASS = OWL + 'equivalentClass';
+const ON_PROPERTY = OWL + 'onProperty';
+/* the properties with which a restriction names the class its property leads to */
+const RESTRICTED_TO = [OWL + 'someValuesFrom', OWL + 'allValuesFrom', OWL + 'onClass', OWL + 'onDataRange'];
 /* the classes of everything: every class is under them, so a path through one says nothing */
 const EVERYTHING = [RDFS + 'Resource', OWL + 'Thing'];
 
-/* the most terms kept for one value, the longest path looked for, and the most paths kept between two classes */
+/* the most terms kept for one value, and the longest path looked for between two classes */
 const MATCHES = 8;
 const PATH_LENGTH = 3;
-const PATHS = 5;
 
 /* a name as words: firstName, first_name and first-name are all "first name" */
 const words = text => String(text).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
@@ -47,10 +49,7 @@ export class Shape {
 
   /* every term, searchable by its name, its label and its comment */
   indexOfTerms() {
-    const index = new MiniSearch({
-      fields: ['name', 'label', 'comment'],
-      searchOptions: { boost: { name: 3, label: 3 }, prefix: true, fuzzy: 0.2 },
-    });
+    const index = new MiniSearch({ fields: ['name', 'label', 'comment'] });
     index.addAll(Object.keys(this.map.terms).map(id => ({
       id,
       name: words(id.slice(id.indexOf(':') + 1)),
@@ -96,7 +95,8 @@ export class Shape {
     for (const relation of [SUBCLASS_OF, EQUIVALENT_CLASS]) {
       for (const quad of this.dataset.match(null, namedNode(relation), null)) {
         if (quad.subject.termType !== 'NamedNode') continue;
-        for (const to of this.map.analysis.irisIn(quad.object, quad.graph)) link(quad.subject.value, relation, to);
+        if (quad.object.termType === 'NamedNode') link(quad.subject.value, relation, quad.object.value);
+        else if (quad.object.termType === 'BlankNode') this.linkRestriction(quad.subject.value, quad.object, quad.graph, link);
       }
     }
     const properties = new Set([...this.dataset.match(null, namedNode(DOMAIN), null)]
@@ -109,6 +109,19 @@ export class Shape {
       }
     }
     return graph;
+  }
+
+  /* A class that is under a restriction (owl:Restriction) is linked by the property of the restriction to the class
+     the restriction names: it says the property runs from the one to the other. The property and the restriction
+     themselves are not classes the class is under. */
+  linkRestriction(cls, restriction, graph, link) {
+    const named = property => [...this.dataset.match(restriction, namedNode(property), null, graph)]
+      .map(quad => quad.object)
+      .filter(object => object.termType === 'NamedNode')
+      .map(object => object.value);
+    for (const property of named(ON_PROPERTY)) {
+      for (const to of RESTRICTED_TO.flatMap(named)) link(cls, property, to);
+    }
   }
 
   /* ---------- from a value to classes ---------- */
@@ -135,9 +148,17 @@ export class Shape {
     return [String(value)];
   }
 
+  /* The terms that one text names: those whose name or label has its words, a word begun or slightly misspelt
+     counting. Only when no term is named so are the comments searched, and then for every word of the text as it
+     is written, so that a word in passing in a long comment does not count as a match. */
+  search(text) {
+    const named = this.index.search(text, { fields: ['name', 'label'], prefix: true, fuzzy: 0.2 });
+    return named.length ? named : this.index.search(text, { fields: ['comment'], combineWith: 'AND' });
+  }
+
   /* the terms that match one text, the best first, each with where it matched and the classes it involves */
   matchesOf(text) {
-    return this.index.search(words(text)).slice(0, MATCHES).map(hit => {
+    return this.search(words(text)).slice(0, MATCHES).map(hit => {
       const iri = this.map.terms[hit.id].i;
       const { kind, classes } = this.classesOf(iri);
       return {
@@ -164,10 +185,10 @@ export class Shape {
     const paths = [];
     for (let a = 0; a < nodes.length; a++) {
       for (let b = a + 1; b < nodes.length; b++) {
+        /* of the paths between two classes, the shortest one says how they relate */
         const between = allSimplePaths(this.classes, nodes[a], nodes[b], { maxDepth: PATH_LENGTH })
-          .sort((x, y) => x.length - y.length)
-          .slice(0, PATHS);
-        for (const path of between) paths.push(path);
+          .sort((x, y) => x.length - y.length);
+        if (between.length) paths.push(between[0]);
       }
     }
 
